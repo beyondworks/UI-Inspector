@@ -1444,7 +1444,7 @@ modeGroup.appendChild(annotateBtn);
 modeGroup.appendChild(makeDivider());
 
 var bulkBtn = makeModeBtn();
-bulkBtn.textContent = "\\uC815\\uB9AC \\u25BE"; /* 정리 ▾ */
+bulkBtn.textContent = "Manage \\u25BE";
 bulkBtn.onclick = function(e) { e.stopPropagation(); toggleBulkMenu(); };
 modeGroup.appendChild(bulkBtn);
 toolbar.appendChild(modeGroup);
@@ -1525,7 +1525,7 @@ function bulkRow(key, label, count, accent, action) {
     + (disabled ? "#b8b8b0" : armed ? "#fff" : accent) + ";cursor:"
     + (disabled ? "default" : "pointer") + ";font:12px " + F_MONO + ";text-align:left;";
   var left = document.createElement("span");
-  left.textContent = armed ? "\\uD55C \\uBC88 \\uB354 \\uD074\\uB9AD \\u2192 \\uC0AD\\uC81C" : label; /* 한 번 더 클릭 → 삭제 */
+  left.textContent = armed ? "Click again \\u2192 Delete" : label;
   var right = document.createElement("span");
   right.style.cssText = "font-size:11px;color:" + (disabled ? "#b8b8b0" : armed ? "#fff" : "#8a8a84") + ";";
   right.textContent = String(count);
@@ -1543,36 +1543,36 @@ function renderBulkMenu() {
   while (bulkMenu.firstChild) bulkMenu.removeChild(bulkMenu.firstChild);
   var c = bulkCounts();
 
-  bulkMenu.appendChild(bulkSectionLabel("\\uC774 \\uD398\\uC774\\uC9C0")); /* 이 페이지 */
-  bulkMenu.appendChild(bulkRow("page-resolve", "\\u2713 \\uD574\\uACB0", c.pageOpen, C_TXT, function() {
+  bulkMenu.appendChild(bulkSectionLabel("This Page"));
+  bulkMenu.appendChild(bulkRow("page-resolve", "\\u2713 Resolve", c.pageOpen, C_TXT, function() {
     wsSend("annotations_bulk_update", { ids: bulkPageIds(true), status: "resolved" });
     hideBulkMenu();
-    showToast("\\uC774 \\uD398\\uC774\\uC9C0 " + c.pageOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
+    showToast("Resolved " + c.pageOpen + " on this page");
   }));
-  bulkMenu.appendChild(bulkRow("page-delete", "\\u2715 \\uC0AD\\uC81C", c.pageTotal, C_RED, function() {
+  bulkMenu.appendChild(bulkRow("page-delete", "\\u2715 Delete", c.pageTotal, C_RED, function() {
     if (bulkArmed !== "page-delete") { armBulk("page-delete"); return; }
     var n = c.pageTotal;
     wsSend("annotations_bulk_remove", { ids: bulkPageIds(false) });
     hideBulkMenu();
-    showToast("\\uC774 \\uD398\\uC774\\uC9C0 " + n + "\\uAC1C \\uC0AD\\uC81C\\uB428");
+    showToast("Deleted " + n + " on this page");
   }));
 
   var div = document.createElement("div");
   div.style.cssText = "height:1px;background:#e0ded6;margin:5px 8px;";
   bulkMenu.appendChild(div);
 
-  bulkMenu.appendChild(bulkSectionLabel("\\uC804\\uCCB4 (\\uBAA8\\uB4E0 \\uD398\\uC774\\uC9C0)")); /* 전체 (모든 페이지) */
-  bulkMenu.appendChild(bulkRow("all-resolve", "\\u2713 \\uD574\\uACB0", c.allOpen, C_TXT, function() {
+  bulkMenu.appendChild(bulkSectionLabel("All Pages"));
+  bulkMenu.appendChild(bulkRow("all-resolve", "\\u2713 Resolve", c.allOpen, C_TXT, function() {
     wsSend("annotations_bulk_update", { ids: bulkAllIds(true), status: "resolved" });
     hideBulkMenu();
-    showToast("\\uC804\\uCCB4 " + c.allOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
+    showToast("Resolved " + c.allOpen + " across all pages");
   }));
-  bulkMenu.appendChild(bulkRow("all-delete", "\\u2715 \\uC0AD\\uC81C", c.allTotal, C_RED, function() {
+  bulkMenu.appendChild(bulkRow("all-delete", "\\u2715 Delete", c.allTotal, C_RED, function() {
     if (bulkArmed !== "all-delete") { armBulk("all-delete"); return; }
     var n = c.allTotal;
     wsSend("annotations_bulk_remove", { ids: bulkAllIds(false) });
     hideBulkMenu();
-    showToast("\\uC804\\uCCB4 " + n + "\\uAC1C \\uC0AD\\uC81C\\uB428");
+    showToast("Deleted " + n + " across all pages");
   }));
 }
 
