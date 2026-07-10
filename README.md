@@ -53,7 +53,7 @@ Restart Claude Code.
 
 ## Annotations — Agentation-style workflow
 
-The injected toolbar (bottom-right) has four buttons: **Inspect**, **Annotate**, **Copy Prompt (open/total)**, and **정리 ▾** (bulk manage). Press **ESC** any time to exit Inspect/Annotate mode (it first closes an open dialog, pin popup, or menu).
+The injected toolbar (bottom-right) is a monochrome capsule cluster: a **◉ brand circle** (click = exit all modes), a mode capsule with **Inspect | Annotate | 정리 ▾**, and a **Copy Prompt (open/total)** CTA capsule that inverts on hover. Press **ESC** any time to exit Inspect/Annotate mode (it first closes an open dialog, pin popup, or menu). The side panel renders as white ticket cards (mono type, red accent) on a near-black ground, and slides the toolbar out of its way.
 
 1. Toggle **Annotate** and click any element — a comment dialog opens (⌘+Enter to save)
 2. A numbered amber pin appears. Add as many annotations as you want — **multiple pins on the same element are supported** (they stack side-by-side)

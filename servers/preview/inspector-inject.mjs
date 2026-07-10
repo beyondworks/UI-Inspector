@@ -12,6 +12,18 @@ export function generateInspectorScript(wsPort) {
 var WS_PORT = ${wsPort};
 var MARKER = "data-gemini-inspector";
 
+/* ── Design tokens — monochrome editorial, red accent ─────────── */
+var F_SANS = "'Helvetica Neue',Helvetica,Arial,system-ui,sans-serif";
+var F_MONO = "ui-monospace,'SF Mono',SFMono-Regular,Menlo,monospace";
+var C_INK = "#161616";     /* capsule black */
+var C_GROUND = "#0e0e0e";  /* panel ground */
+var C_CARD = "#f4f4f0";    /* warm off-white ticket card */
+var C_TXT = "#141414";     /* text on card */
+var C_MUTE_D = "#9a9a94";  /* muted on dark */
+var C_MUTE_L = "#6b6b66";  /* muted on card */
+var C_WELL = "#eceae3";    /* inset well on card */
+var C_RED = "#ff3000";     /* accent */
+
 /* ── UI Glossary ─────────────────────────────────────────────── */
 var UI_GLOSSARY = {
   "Header":"페이지 최상단 영역. 브랜드 로고, 내비게이션, 검색, 사용자 메뉴 등 전역 요소를 배치",
@@ -505,39 +517,42 @@ document.documentElement.appendChild(overlay);
 
 var hoverBox = document.createElement("div");
 hoverBox.setAttribute(MARKER, "hover");
-hoverBox.style.cssText = "position:fixed;border:2px solid #3b82f6;background:rgba(59,130,246,0.1);pointer-events:none;display:none;transition:all 0.1s ease;z-index:99999;";
+hoverBox.style.cssText = "position:fixed;border:1.5px solid #141414;box-shadow:0 0 0 1.5px rgba(255,255,255,0.85);background:rgba(20,20,20,0.05);pointer-events:none;display:none;transition:all 0.1s ease;z-index:99999;border-radius:2px;";
 overlay.appendChild(hoverBox);
 
 var labelEl = document.createElement("div");
 labelEl.setAttribute(MARKER, "label");
-labelEl.style.cssText = "position:fixed;background:#1e293b;color:#e2e8f0;padding:4px 8px;border-radius:4px;font-size:12px;font-family:monospace;pointer-events:none;white-space:nowrap;z-index:100000;display:none;";
+labelEl.style.cssText = "position:fixed;background:" + C_INK + ";color:#f4f4f0;padding:6px 13px;border-radius:999px;font:10px/1.4 " + F_MONO + ";letter-spacing:0.02em;pointer-events:none;white-space:nowrap;z-index:100000;display:none;box-shadow:0 4px 14px rgba(0,0,0,0.35);";
 overlay.appendChild(labelEl);
 
 /* ── Code Panel (Side Panel) ──────────────────────────────────── */
 var panel = document.createElement("div");
 panel.setAttribute(MARKER, "panel");
-panel.style.cssText = "position:fixed;top:0;right:0;width:320px;height:100vh;background:#0f172a;color:#e2e8f0;font-family:'SF Mono',SFMono-Regular,ui-monospace,Menlo,monospace;font-size:13px;z-index:100002;transform:translateX(100%);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;border-left:1px solid #1e293b;box-shadow:-4px 0 20px rgba(0,0,0,0.3);pointer-events:auto;";
+panel.style.cssText = "position:fixed;top:0;right:0;width:320px;height:100vh;background:" + C_GROUND + ";color:#e8e8e4;font-family:" + F_MONO + ";font-size:12px;z-index:100002;transform:translateX(100%);transition:transform 0.3s cubic-bezier(0.16,1,0.3,1);overflow-y:auto;border-left:1px solid #232320;box-shadow:-8px 0 32px rgba(0,0,0,0.45);pointer-events:auto;";
 
 var panelHeader = document.createElement("div");
 panelHeader.setAttribute(MARKER, "panel-header");
-panelHeader.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid #1e293b;position:sticky;top:0;background:#0f172a;z-index:1;";
+panelHeader.style.cssText = "display:flex;align-items:center;justify-content:space-between;padding:18px 18px 14px;position:sticky;top:0;background:" + C_GROUND + ";z-index:1;";
 var panelTitle = document.createElement("span");
-panelTitle.style.cssText = "font-weight:700;font-size:13px;color:#94a3b8;text-transform:uppercase;letter-spacing:0.05em;";
-panelTitle.textContent = "Inspector";
+panelTitle.style.cssText = "display:flex;align-items:center;gap:8px;font:700 10px " + F_MONO + ";color:#f4f4f0;text-transform:uppercase;letter-spacing:0.22em;";
+var titleSq = document.createElement("span");
+titleSq.style.cssText = "width:7px;height:7px;background:" + C_RED + ";display:inline-block;flex:none;";
+panelTitle.appendChild(titleSq);
+panelTitle.appendChild(document.createTextNode("Inspector"));
 panelHeader.appendChild(panelTitle);
 var closeBtn = document.createElement("button");
 closeBtn.setAttribute(MARKER, "btn");
 closeBtn.textContent = "\\u2715";
-closeBtn.style.cssText = "background:none;border:none;color:#64748b;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px;";
-closeBtn.onmouseenter = function() { closeBtn.style.color = "#e2e8f0"; };
-closeBtn.onmouseleave = function() { closeBtn.style.color = "#64748b"; };
+closeBtn.style.cssText = "background:none;border:1px solid #2e2e2a;color:" + C_MUTE_D + ";cursor:pointer;font-size:11px;width:26px;height:26px;line-height:1;border-radius:999px;transition:all 0.18s ease;";
+closeBtn.onmouseenter = function() { closeBtn.style.color = "#f4f4f0"; closeBtn.style.borderColor = "#f4f4f0"; };
+closeBtn.onmouseleave = function() { closeBtn.style.color = C_MUTE_D; closeBtn.style.borderColor = "#2e2e2a"; };
 closeBtn.onclick = function() { hidePanel(); };
 panelHeader.appendChild(closeBtn);
 panel.appendChild(panelHeader);
 
 var panelBody = document.createElement("div");
 panelBody.setAttribute(MARKER, "panel-body");
-panelBody.style.cssText = "padding:12px 16px;display:flex;flex-direction:column;gap:16px;";
+panelBody.style.cssText = "padding:2px 14px 18px;display:flex;flex-direction:column;gap:10px;";
 panel.appendChild(panelBody);
 document.documentElement.appendChild(panel);
 
@@ -553,14 +568,38 @@ function showPanel() {
   ensureAttached(panel);
   panel.style.transform = "translateX(0)";
   panelVisible = true;
+  /* slide the toolbar clear of the panel */
+  toolbar.style.right = "338px";
+  bulkMenu.style.right = "338px";
 }
-function hidePanel() { panel.style.transform = "translateX(100%)"; panelVisible = false; }
+function hidePanel() {
+  panel.style.transform = "translateX(100%)";
+  panelVisible = false;
+  toolbar.style.right = "18px";
+  bulkMenu.style.right = "18px";
+}
 
 function createSectionLabel(text) {
   var el = document.createElement("div");
-  el.style.cssText = "font-weight:700;color:#94a3b8;font-size:10px;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:4px;";
-  el.textContent = text;
+  el.style.cssText = "display:flex;align-items:center;gap:6px;font:700 9px " + F_MONO + ";color:" + C_MUTE_L + ";text-transform:uppercase;letter-spacing:0.16em;margin-bottom:8px;";
+  var sq = document.createElement("span");
+  sq.style.cssText = "width:6px;height:6px;background:" + C_RED + ";display:inline-block;flex:none;";
+  el.appendChild(sq);
+  el.appendChild(document.createTextNode(text));
   return el;
+}
+
+/* ticket card: warm white surface with side notches (panel ground shows through) */
+function createCard() {
+  var card = document.createElement("div");
+  card.style.cssText = "position:relative;background:" + C_CARD + ";border-radius:14px;padding:14px 18px;overflow:hidden;";
+  var nL = document.createElement("span");
+  nL.style.cssText = "position:absolute;left:-7px;top:20px;width:14px;height:14px;border-radius:50%;background:" + C_GROUND + ";";
+  var nR = document.createElement("span");
+  nR.style.cssText = "position:absolute;right:-7px;top:20px;width:14px;height:14px;border-radius:50%;background:" + C_GROUND + ";";
+  card.appendChild(nL);
+  card.appendChild(nR);
+  return card;
 }
 
 function renderPanel(info) {
@@ -569,18 +608,18 @@ function renderPanel(info) {
   /* Name (정확한 이름) */
   if (info.elementName) {
     var nm = info.elementName;
-    var nameSection = document.createElement("div");
+    var nameSection = createCard();
     nameSection.appendChild(createSectionLabel("Name"));
 
     var nameRow = document.createElement("div");
-    nameRow.style.cssText = "display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;";
+    nameRow.style.cssText = "display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px;";
     var primaryEl = document.createElement("div");
-    primaryEl.style.cssText = "font-size:14px;font-weight:700;color:#fbbf24;word-break:break-all;line-height:1.3;";
+    primaryEl.style.cssText = "font:700 15px/1.3 " + F_MONO + ";color:" + C_TXT + ";word-break:break-all;";
     primaryEl.textContent = nm.primary;
     nameRow.appendChild(primaryEl);
     if (nm.primarySource) {
       var srcTag = document.createElement("span");
-      srcTag.style.cssText = "font-size:9px;color:#64748b;background:#1e293b;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:0.05em;";
+      srcTag.style.cssText = "font:700 8px " + F_MONO + ";color:#f4f4f0;background:" + C_INK + ";padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:0.1em;";
       srcTag.textContent = nm.primarySource;
       nameRow.appendChild(srcTag);
     }
@@ -602,13 +641,13 @@ function renderPanel(info) {
 
     if (rows.length > 0) {
       var detailGrid = document.createElement("div");
-      detailGrid.style.cssText = "display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:11px;";
+      detailGrid.style.cssText = "display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font:10px " + F_MONO + ";";
       for (var ri = 0; ri < rows.length; ri++) {
         var kSpan = document.createElement("span");
-        kSpan.style.color = "#64748b";
+        kSpan.style.color = C_MUTE_L;
         kSpan.textContent = rows[ri][0];
         var vSpan = document.createElement("span");
-        vSpan.style.cssText = "color:#cbd5e1;word-break:break-all;";
+        vSpan.style.cssText = "color:" + C_TXT + ";word-break:break-all;";
         vSpan.textContent = rows[ri][1];
         detailGrid.appendChild(kSpan);
         detailGrid.appendChild(vSpan);
@@ -618,7 +657,7 @@ function renderPanel(info) {
 
     if (nm.selector) {
       var selEl = document.createElement("div");
-      selEl.style.cssText = "margin-top:6px;font-size:10px;color:#94a3b8;background:#0c1524;padding:4px 6px;border-radius:3px;word-break:break-all;font-family:'SF Mono',monospace;";
+      selEl.style.cssText = "margin-top:8px;font:10px " + F_MONO + ";color:#3d3d38;background:" + C_WELL + ";padding:6px 9px;border-radius:8px;word-break:break-all;";
       selEl.textContent = nm.selector;
       nameSection.appendChild(selEl);
     }
@@ -628,95 +667,101 @@ function renderPanel(info) {
 
   /* Source */
   if (info.sourceLocation) {
-    var srcSection = document.createElement("div");
+    var srcSection = createCard();
     srcSection.appendChild(createSectionLabel("Source"));
     var srcVal = document.createElement("div");
-    srcVal.style.cssText = "color:#3b82f6;word-break:break-all;";
+    srcVal.style.cssText = "font:700 11px " + F_MONO + ";color:" + C_TXT + ";word-break:break-all;";
     srcVal.textContent = info.sourceLocation.file + ":" + info.sourceLocation.line;
     srcSection.appendChild(srcVal);
     panelBody.appendChild(srcSection);
   }
 
   /* Design Term */
-  var termSection = document.createElement("div");
+  var termSection = createCard();
   termSection.appendChild(createSectionLabel("Design Term"));
   var badge = document.createElement("div");
-  badge.style.cssText = "display:inline-block;padding:2px 8px;border-radius:4px;background:#1e3a5f;color:#60a5fa;font-size:12px;font-weight:700;margin-bottom:6px;";
+  badge.style.cssText = "display:inline-block;padding:5px 12px;border-radius:999px;background:" + C_INK + ";color:#f4f4f0;font:700 10px " + F_MONO + ";text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;";
   badge.textContent = info.uiTerm;
   termSection.appendChild(badge);
   if (info.uiDescription) {
     var desc = document.createElement("div");
-    desc.style.cssText = "font-size:11px;color:#94a3b8;line-height:1.5;padding:6px 8px;background:#0c1524;border-radius:4px;border-left:2px solid #1e3a5f;";
+    desc.style.cssText = "font:10px/1.7 " + F_MONO + ";color:#55554f;padding:8px 10px;background:" + C_WELL + ";border-radius:8px;";
     desc.textContent = info.uiDescription;
     termSection.appendChild(desc);
   }
   panelBody.appendChild(termSection);
 
-  /* Element */
-  var elSection = document.createElement("div");
-  elSection.appendChild(createSectionLabel("Element"));
-  var tagEl = document.createElement("div");
-  tagEl.style.color = "#f472b6";
+  /* Spec: element + computed styles + size in one card, hairline-separated */
+  var specSection = createCard();
+  specSection.appendChild(createSectionLabel("Spec"));
+
+  var tagRow = document.createElement("div");
+  tagRow.style.cssText = "display:flex;align-items:baseline;justify-content:space-between;gap:8px;";
+  var tagEl = document.createElement("span");
+  tagEl.style.cssText = "font:700 12px " + F_MONO + ";color:" + C_TXT + ";";
   tagEl.textContent = "<" + info.tag + ">";
-  elSection.appendChild(tagEl);
+  tagRow.appendChild(tagEl);
+  var sizeVal = document.createElement("span");
+  sizeVal.style.cssText = "font:700 11px " + F_MONO + ";color:" + C_TXT + ";white-space:nowrap;";
+  sizeVal.textContent = Math.round(info.boundingRect.width) + " \\u00d7 " + Math.round(info.boundingRect.height) + "px";
+  tagRow.appendChild(sizeVal);
+  specSection.appendChild(tagRow);
   if (info.className) {
     var clsEl = document.createElement("div");
-    clsEl.style.cssText = "color:#94a3b8;font-size:11px;margin-top:4px;word-break:break-all;max-height:60px;overflow:hidden;";
+    clsEl.style.cssText = "color:" + C_MUTE_L + ";font:9px/1.6 " + F_MONO + ";margin-top:4px;word-break:break-all;max-height:44px;overflow:hidden;";
     clsEl.textContent = info.className;
-    elSection.appendChild(clsEl);
+    specSection.appendChild(clsEl);
   }
-  panelBody.appendChild(elSection);
 
-  /* Computed Styles */
-  var styleSection = document.createElement("div");
-  styleSection.appendChild(createSectionLabel("Styles"));
+  var hr = document.createElement("div");
+  hr.style.cssText = "height:1px;background:#e0ded6;margin:10px 0;";
+  specSection.appendChild(hr);
+
   var grid = document.createElement("div");
-  grid.style.cssText = "display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;font-size:11px;";
+  grid.style.cssText = "display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font:10px " + F_MONO + ";";
   var keys = Object.keys(info.computedStyles);
   for (var i = 0; i < keys.length; i++) {
     var k = keys[i];
     var v = info.computedStyles[k];
     if (!v || v === "normal" || v === "static" || v === "none" || v === "0px" || v === "auto") continue;
     var kSpan = document.createElement("span");
-    kSpan.style.color = "#94a3b8";
+    kSpan.style.color = C_MUTE_L;
     kSpan.textContent = k.replace(/([A-Z])/g, function(m) { return "-" + m.toLowerCase(); });
     var vSpan = document.createElement("span");
-    vSpan.style.color = "#67e8f9";
+    vSpan.style.cssText = "color:" + C_TXT + ";word-break:break-all;text-align:right;";
     vSpan.textContent = v;
     grid.appendChild(kSpan);
     grid.appendChild(vSpan);
   }
-  styleSection.appendChild(grid);
-  panelBody.appendChild(styleSection);
+  specSection.appendChild(grid);
+  panelBody.appendChild(specSection);
 
-  /* Size */
-  var sizeSection = document.createElement("div");
-  sizeSection.appendChild(createSectionLabel("Size"));
-  var sizeVal = document.createElement("div");
-  sizeVal.style.cssText = "font-size:12px;color:#a78bfa;";
-  sizeVal.textContent = Math.round(info.boundingRect.width) + " \\u00d7 " + Math.round(info.boundingRect.height) + "px";
-  sizeSection.appendChild(sizeVal);
-  panelBody.appendChild(sizeSection);
-
-  /* Text */
+  /* Text + Parent Chain: bare rows on the dark ground (no card) */
   var txt = (info.textContent || "").trim();
   if (txt.length > 0) {
     var txtSection = document.createElement("div");
-    txtSection.appendChild(createSectionLabel("Text"));
+    txtSection.style.cssText = "padding:10px 6px 0;";
+    var txtLbl = document.createElement("div");
+    txtLbl.style.cssText = "font:700 8px " + F_MONO + ";color:#5c5c56;text-transform:uppercase;letter-spacing:0.16em;margin-bottom:5px;";
+    txtLbl.textContent = "Text";
+    txtSection.appendChild(txtLbl);
     var txtVal = document.createElement("div");
-    txtVal.style.cssText = "font-size:11px;color:#cbd5e1;max-height:60px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;";
-    txtVal.textContent = txt.slice(0, 100);
+    txtVal.style.cssText = "font:10px/1.6 " + F_MONO + ";color:#b9b9b2;max-height:48px;overflow:hidden;text-overflow:ellipsis;word-break:break-all;";
+    txtVal.textContent = "\\u201C" + txt.slice(0, 100) + "\\u201D";
     txtSection.appendChild(txtVal);
     panelBody.appendChild(txtSection);
   }
 
-  /* Parent Chain */
   if (info.parentChain && info.parentChain.length > 0) {
     var chainSection = document.createElement("div");
-    chainSection.appendChild(createSectionLabel("Parent Chain"));
+    chainSection.style.cssText = "padding:6px 6px 0;";
+    var chainLbl = document.createElement("div");
+    chainLbl.style.cssText = "font:700 8px " + F_MONO + ";color:#5c5c56;text-transform:uppercase;letter-spacing:0.16em;margin-bottom:5px;";
+    chainLbl.textContent = "Parent Chain";
+    chainSection.appendChild(chainLbl);
     var chainVal = document.createElement("div");
-    chainVal.style.cssText = "font-size:10px;color:#64748b;line-height:1.6;word-break:break-all;max-height:80px;overflow:hidden;";
-    chainVal.textContent = info.parentChain.slice(0, 6).join(" > ");
+    chainVal.style.cssText = "font:9px/1.8 " + F_MONO + ";color:#7a7a74;word-break:break-all;max-height:72px;overflow:hidden;";
+    chainVal.textContent = info.parentChain.slice(0, 6).join(" \\u203A ");
     chainSection.appendChild(chainVal);
     panelBody.appendChild(chainSection);
   }
@@ -741,8 +786,11 @@ function showToast(text) {
   if (toastTimer) clearTimeout(toastTimer);
   toastEl = document.createElement("div");
   toastEl.setAttribute(MARKER, "toast");
-  toastEl.style.cssText = "position:fixed;bottom:16px;left:16px;background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:6px;font:12px system-ui,sans-serif;z-index:100006;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid #334155;pointer-events:none;";
-  toastEl.textContent = text;
+  toastEl.style.cssText = "position:fixed;bottom:18px;left:18px;background:" + C_INK + ";color:#f4f4f0;padding:10px 16px;border-radius:999px;font:11px " + F_MONO + ";letter-spacing:0.02em;z-index:100006;box-shadow:0 6px 20px rgba(0,0,0,0.4);pointer-events:none;display:flex;align-items:center;gap:8px;";
+  var tDot = document.createElement("span");
+  tDot.style.cssText = "width:6px;height:6px;border-radius:50%;background:" + C_RED + ";flex:none;";
+  toastEl.appendChild(tDot);
+  toastEl.appendChild(document.createTextNode(text));
   document.documentElement.appendChild(toastEl);
   toastTimer = setTimeout(function() {
     if (toastEl) { toastEl.remove(); toastEl = null; }
@@ -784,12 +832,14 @@ function createPin(ann, indexInGroup) {
   var pin = document.createElement("div");
   pin.setAttribute(MARKER, "pin");
   var resolved = ann.status === "resolved";
-  pin.style.cssText = "position:fixed;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;cursor:pointer;pointer-events:auto;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid #fff;"
-    + (resolved ? "background:#16a34a;color:#fff;" : "background:#f59e0b;color:#1c1917;");
+  pin.style.cssText = "position:fixed;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 10px " + F_MONO + ";cursor:pointer;pointer-events:auto;box-shadow:0 3px 10px rgba(0,0,0,0.35);border:2px solid " + C_CARD + ";transition:transform 0.15s ease;"
+    + (resolved ? "background:" + C_INK + ";color:#f4f4f0;" : "background:" + C_RED + ";color:#fff;");
   pin.textContent = resolved ? "\\u2713" : String(ann.number);
   pin.title = ann.comment || "";
   pin._ann = ann;
   pin._offset = indexInGroup;
+  pin.onmouseenter = function() { pin.style.transform = "scale(1.18)"; };
+  pin.onmouseleave = function() { pin.style.transform = "scale(1)"; };
   pin.onclick = function(ev) {
     ev.stopPropagation();
     ev.preventDefault();
@@ -860,8 +910,16 @@ function makeSmallBtn(text, accent) {
   var b = document.createElement("button");
   b.setAttribute(MARKER, "btn");
   b.textContent = text;
-  b.style.cssText = "padding:4px 10px;border-radius:5px;font:12px system-ui,sans-serif;cursor:pointer;border:1px solid "
-    + (accent ? "#f59e0b;background:#f59e0b;color:#1c1917;font-weight:700;" : "#334155;background:transparent;color:#94a3b8;");
+  b.style.cssText = "padding:7px 14px;border-radius:999px;font:600 11px " + F_SANS + ";cursor:pointer;transition:all 0.18s ease;border:1px solid "
+    + (accent ? C_INK + ";background:" + C_INK + ";color:#f4f4f0;" : "#c9c9c1;background:transparent;color:" + C_TXT + ";");
+  b.onmouseenter = function() {
+    if (accent) { b.style.background = "#33332e"; b.style.borderColor = "#33332e"; }
+    else { b.style.borderColor = C_TXT; }
+  };
+  b.onmouseleave = function() {
+    if (accent) { b.style.background = C_INK; b.style.borderColor = C_INK; }
+    else { b.style.borderColor = "#c9c9c1"; }
+  };
   return b;
 }
 
@@ -878,16 +936,21 @@ function openCommentDialog(target, x, y) {
 
   var box = document.createElement("div");
   box.setAttribute(MARKER, "dialog");
-  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:10px;width:280px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+  box.style.cssText = "position:fixed;z-index:100004;background:" + C_CARD + ";border-radius:16px;padding:14px;width:280px;box-shadow:0 16px 44px rgba(0,0,0,0.35);pointer-events:auto;font-family:" + F_MONO + ";";
 
   var title = document.createElement("div");
-  title.style.cssText = "font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px;word-break:break-all;";
-  title.textContent = (info.elementName && info.elementName.primary ? info.elementName.primary : info.tag) + " \\u00b7 " + info.uiTerm;
+  title.style.cssText = "display:flex;align-items:center;gap:7px;font:700 11px " + F_MONO + ";color:" + C_TXT + ";margin-bottom:9px;word-break:break-all;";
+  var tSq = document.createElement("span");
+  tSq.style.cssText = "width:6px;height:6px;background:" + C_RED + ";display:inline-block;flex:none;";
+  title.appendChild(tSq);
+  title.appendChild(document.createTextNode((info.elementName && info.elementName.primary ? info.elementName.primary : info.tag) + " \\u00b7 " + info.uiTerm));
   box.appendChild(title);
 
   var ta = document.createElement("textarea");
   ta.placeholder = "\\uC694\\uCCAD \\uC0AC\\uD56D\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
-  ta.style.cssText = "width:100%;height:64px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  ta.style.cssText = "width:100%;height:64px;background:#fff;color:" + C_TXT + ";border:1px solid #dcdcd4;border-radius:10px;padding:8px 10px;font:12px " + F_MONO + ";resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.18s ease;";
+  ta.onfocus = function() { ta.style.borderColor = C_TXT; };
+  ta.onblur = function() { ta.style.borderColor = "#dcdcd4"; };
   box.appendChild(ta);
 
   var row = document.createElement("div");
@@ -931,22 +994,22 @@ function openPinPopup(ann, pin) {
   var box = document.createElement("div");
   box.setAttribute(MARKER, "popup");
   var resolved = ann.status === "resolved";
-  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid " + (resolved ? "#16a34a" : "#f59e0b") + ";border-radius:8px;padding:10px;width:280px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+  box.style.cssText = "position:fixed;z-index:100004;background:" + C_CARD + ";border-radius:16px;padding:14px;width:280px;box-shadow:0 16px 44px rgba(0,0,0,0.35);pointer-events:auto;font-family:" + F_MONO + ";";
 
   var head = document.createElement("div");
-  head.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:6px;";
+  head.style.cssText = "display:flex;align-items:center;gap:7px;margin-bottom:9px;";
   var numBadge = document.createElement("span");
-  numBadge.style.cssText = "font:700 11px system-ui;color:" + (resolved ? "#16a34a" : "#f59e0b") + ";";
+  numBadge.style.cssText = "font:700 12px " + F_MONO + ";color:" + (resolved ? C_TXT : C_RED) + ";";
   numBadge.textContent = "#" + ann.number;
   head.appendChild(numBadge);
   var statusBadge = document.createElement("span");
-  statusBadge.style.cssText = "font-size:9px;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:0.05em;"
-    + (resolved ? "background:#052e16;color:#4ade80;" : "background:#451a03;color:#fbbf24;");
+  statusBadge.style.cssText = "font:700 8px " + F_MONO + ";padding:3px 9px;border-radius:999px;text-transform:uppercase;letter-spacing:0.1em;"
+    + (resolved ? "background:" + C_INK + ";color:#f4f4f0;" : "background:" + C_RED + ";color:#fff;");
   statusBadge.textContent = resolved ? "resolved" : "open";
   head.appendChild(statusBadge);
   if (ann.elements && ann.elements.length > 1) {
     var groupChip = document.createElement("span");
-    groupChip.style.cssText = "font-size:9px;padding:1px 6px;border-radius:3px;background:#1e3a5f;color:#60a5fa;";
+    groupChip.style.cssText = "font:700 8px " + F_MONO + ";padding:3px 9px;border-radius:999px;background:" + C_WELL + ";color:#3d3d38;letter-spacing:0.04em;";
     groupChip.textContent = "\\uC694\\uC18C " + ann.elements.length + "\\uAC1C";
     head.appendChild(groupChip);
     /* show which elements belong to this group */
@@ -960,7 +1023,7 @@ function openPinPopup(ann, pin) {
   var elName = ann.element && ann.element.elementName ? ann.element.elementName.primary : "";
   if (elName) {
     var nameSpan = document.createElement("span");
-    nameSpan.style.cssText = "font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
+    nameSpan.style.cssText = "font:10px " + F_MONO + ";color:" + C_MUTE_L + ";overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
     nameSpan.textContent = elName;
     head.appendChild(nameSpan);
   }
@@ -968,12 +1031,14 @@ function openPinPopup(ann, pin) {
 
   var ta = document.createElement("textarea");
   ta.value = ann.comment || "";
-  ta.style.cssText = "width:100%;height:56px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  ta.style.cssText = "width:100%;height:56px;background:#fff;color:" + C_TXT + ";border:1px solid #dcdcd4;border-radius:10px;padding:8px 10px;font:12px " + F_MONO + ";resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.18s ease;";
+  ta.onfocus = function() { ta.style.borderColor = C_TXT; };
+  ta.onblur = function() { ta.style.borderColor = "#dcdcd4"; };
   box.appendChild(ta);
 
   if (resolved && ann.resolvedNote) {
     var note = document.createElement("div");
-    note.style.cssText = "font-size:11px;color:#4ade80;background:#052e16;border-radius:4px;padding:5px 8px;margin-top:6px;line-height:1.4;";
+    note.style.cssText = "font:10px/1.6 " + F_MONO + ";color:#3d3d38;background:" + C_WELL + ";border-radius:8px;padding:7px 10px;margin-top:8px;";
     note.textContent = "\\u2713 " + ann.resolvedNote;
     box.appendChild(note);
   }
@@ -981,7 +1046,7 @@ function openPinPopup(ann, pin) {
   var row = document.createElement("div");
   row.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
   var delBtn = makeSmallBtn("\\uC0AD\\uC81C", false);
-  delBtn.style.color = "#f87171";
+  delBtn.style.color = C_RED;
   delBtn.onclick = function() {
     wsSend("annotation_remove", { id: ann.id });
     closePinPopup();
@@ -1074,7 +1139,7 @@ function outlineElements(els, ms) {
     var r = el.getBoundingClientRect();
     var b = document.createElement("div");
     b.setAttribute(MARKER, "group-outline");
-    b.style.cssText = "position:fixed;border:2px solid #f59e0b;border-radius:3px;background:rgba(245,158,11,0.08);pointer-events:none;z-index:100000;transition:opacity 0.3s;"
+    b.style.cssText = "position:fixed;border:1.5px solid " + C_RED + ";border-radius:3px;background:rgba(255,48,0,0.06);pointer-events:none;z-index:100000;transition:opacity 0.3s;"
       + "left:" + r.x + "px;top:" + r.y + "px;width:" + r.width + "px;height:" + r.height + "px;";
     document.documentElement.appendChild(b);
     boxes.push(b);
@@ -1103,15 +1168,18 @@ function openGroupCommentDialog(targets, x, y) {
 
   var box = document.createElement("div");
   box.setAttribute(MARKER, "dialog");
-  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:10px;width:300px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+  box.style.cssText = "position:fixed;z-index:100004;background:" + C_CARD + ";border-radius:16px;padding:14px;width:300px;box-shadow:0 16px 44px rgba(0,0,0,0.35);pointer-events:auto;font-family:" + F_MONO + ";";
 
   var title = document.createElement("div");
-  title.style.cssText = "font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px;";
-  title.textContent = "\\uC694\\uC18C " + infos.length + "\\uAC1C \\uC120\\uD0DD\\uB428" + (truncated ? " (\\uCD5C\\uB300 " + MAX_GROUP + "\\uAC1C\\uAE4C\\uC9C0)" : "");
+  title.style.cssText = "display:flex;align-items:center;gap:7px;font:700 11px " + F_MONO + ";color:" + C_TXT + ";margin-bottom:9px;";
+  var gSq = document.createElement("span");
+  gSq.style.cssText = "width:6px;height:6px;background:" + C_RED + ";display:inline-block;flex:none;";
+  title.appendChild(gSq);
+  title.appendChild(document.createTextNode("\\uC694\\uC18C " + infos.length + "\\uAC1C \\uC120\\uD0DD\\uB428" + (truncated ? " (\\uCD5C\\uB300 " + MAX_GROUP + "\\uAC1C\\uAE4C\\uC9C0)" : "")));
   box.appendChild(title);
 
   var listEl = document.createElement("div");
-  listEl.style.cssText = "font-size:10px;color:#94a3b8;line-height:1.6;max-height:72px;overflow-y:auto;background:#0c1524;border-radius:4px;padding:5px 8px;margin-bottom:6px;word-break:break-all;";
+  listEl.style.cssText = "font:10px/1.7 " + F_MONO + ";color:#3d3d38;max-height:72px;overflow-y:auto;background:" + C_WELL + ";border-radius:8px;padding:7px 10px;margin-bottom:9px;word-break:break-all;";
   var previewCount = Math.min(infos.length, 8);
   for (var p = 0; p < previewCount; p++) {
     var row = document.createElement("div");
@@ -1128,7 +1196,9 @@ function openGroupCommentDialog(targets, x, y) {
 
   var ta = document.createElement("textarea");
   ta.placeholder = "\\uC120\\uD0DD\\uB41C \\uC694\\uC18C\\uB4E4\\uC5D0 \\uB300\\uD55C \\uC694\\uCCAD\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
-  ta.style.cssText = "width:100%;height:56px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  ta.style.cssText = "width:100%;height:56px;background:#fff;color:" + C_TXT + ";border:1px solid #dcdcd4;border-radius:10px;padding:8px 10px;font:12px " + F_MONO + ";resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.18s ease;";
+  ta.onfocus = function() { ta.style.borderColor = C_TXT; };
+  ta.onblur = function() { ta.style.borderColor = "#dcdcd4"; };
   box.appendChild(ta);
 
   var row2 = document.createElement("div");
@@ -1256,13 +1326,13 @@ function flashHighlight(data) {
 
   var hl = document.createElement("div");
   hl.setAttribute(MARKER, "highlight");
-  hl.style.cssText = "position:fixed;border:3px solid #f59e0b;border-radius:4px;background:rgba(245,158,11,0.15);pointer-events:none;z-index:100000;transition:opacity 0.3s;";
+  hl.style.cssText = "position:fixed;border:2px solid " + C_RED + ";border-radius:4px;background:rgba(255,48,0,0.1);pointer-events:none;z-index:100000;transition:opacity 0.3s;";
   document.documentElement.appendChild(hl);
   var lbl = null;
   if (data.label) {
     lbl = document.createElement("div");
     lbl.setAttribute(MARKER, "highlight-label");
-    lbl.style.cssText = "position:fixed;background:#f59e0b;color:#1c1917;padding:3px 8px;border-radius:4px;font:700 11px system-ui,sans-serif;pointer-events:none;z-index:100000;white-space:nowrap;";
+    lbl.style.cssText = "position:fixed;background:" + C_RED + ";color:#fff;padding:4px 11px;border-radius:999px;font:700 10px " + F_MONO + ";letter-spacing:0.02em;pointer-events:none;z-index:100000;white-space:nowrap;";
     lbl.textContent = data.label;
     document.documentElement.appendChild(lbl);
   }
@@ -1289,15 +1359,55 @@ function flashHighlight(data) {
   }, 50);
 }
 
-/* ── Mini Toolbar ─────────────────────────────────────────────── */
+/* ── Toolbar: brand circle + mode capsule + CTA capsule ───────── */
 var toolbar = document.createElement("div");
 toolbar.setAttribute(MARKER, "toolbar");
-toolbar.style.cssText = "position:fixed;bottom:16px;right:16px;z-index:100003;display:flex;gap:4px;pointer-events:auto;font-family:system-ui,-apple-system,sans-serif;font-size:13px;";
+toolbar.style.cssText = "position:fixed;bottom:18px;right:18px;z-index:100003;display:flex;align-items:center;gap:8px;pointer-events:auto;font-family:" + F_SANS + ";transition:right 0.3s cubic-bezier(0.16,1,0.3,1);";
 
-var toggleBtn = document.createElement("button");
-toggleBtn.setAttribute(MARKER, "btn");
-toggleBtn.textContent = "Inspect OFF";
-toggleBtn.style.cssText = "padding:6px 14px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#94a3b8;cursor:pointer;font-size:13px;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.3);";
+/* brand circle — click turns every mode off */
+var brandBtn = document.createElement("button");
+brandBtn.setAttribute(MARKER, "btn");
+brandBtn.textContent = "\\u25C9"; /* ◉ */
+brandBtn.title = "\\uBAA8\\uB4E0 \\uBAA8\\uB4DC \\uD574\\uC81C (ESC)"; /* 모든 모드 해제 */
+brandBtn.style.cssText = "width:44px;height:44px;flex:none;border-radius:50%;background:" + C_INK + ";color:#f4f4f0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,0.35);transition:transform 0.18s ease,color 0.18s ease;";
+brandBtn.onmouseenter = function() { brandBtn.style.transform = "scale(1.07)"; brandBtn.style.color = C_RED; };
+brandBtn.onmouseleave = function() { brandBtn.style.transform = "scale(1)"; brandBtn.style.color = "#f4f4f0"; };
+brandBtn.onclick = function() {
+  if (inspectorEnabled) {
+    inspectorEnabled = false;
+    wsSend("inspector_state", { enabled: false });
+    hidePanel();
+  }
+  annotateEnabled = false;
+  hoverBox.style.display = "none";
+  labelEl.style.display = "none";
+  closeCommentDialog();
+  closePinPopup();
+  hideBulkMenu();
+  updateToolbarState();
+};
+toolbar.appendChild(brandBtn);
+
+/* mode capsule: Inspect | Annotate | 정리 */
+var modeGroup = document.createElement("div");
+modeGroup.setAttribute(MARKER, "mode-group");
+modeGroup.style.cssText = "display:flex;align-items:center;background:" + C_INK + ";border-radius:999px;padding:4px;box-shadow:0 6px 20px rgba(0,0,0,0.35);";
+
+function makeModeBtn() {
+  var b = document.createElement("button");
+  b.setAttribute(MARKER, "btn");
+  b.style.cssText = "padding:9px 16px;border:none;background:transparent;color:" + C_MUTE_D + ";cursor:pointer;font:13px " + F_SANS + ";letter-spacing:0.01em;border-radius:999px;transition:color 0.18s ease,background 0.18s ease;white-space:nowrap;";
+  b.onmouseenter = function() { b.style.color = "#f4f4f0"; };
+  b.onmouseleave = function() { updateToolbarState(); };
+  return b;
+}
+function makeDivider() {
+  var d = document.createElement("span");
+  d.style.cssText = "width:1px;height:15px;background:#33332f;flex:none;";
+  return d;
+}
+
+var toggleBtn = makeModeBtn();
 toggleBtn.onclick = function() {
   inspectorEnabled = !inspectorEnabled;
   if (inspectorEnabled) {
@@ -1312,12 +1422,10 @@ toggleBtn.onclick = function() {
     hidePanel();
   }
 };
-toolbar.appendChild(toggleBtn);
+modeGroup.appendChild(toggleBtn);
+modeGroup.appendChild(makeDivider());
 
-var annotateBtn = document.createElement("button");
-annotateBtn.setAttribute(MARKER, "btn");
-annotateBtn.textContent = "Annotate OFF";
-annotateBtn.style.cssText = toggleBtn.style.cssText;
+var annotateBtn = makeModeBtn();
 annotateBtn.onclick = function() {
   annotateEnabled = !annotateEnabled;
   if (annotateEnabled && inspectorEnabled) {
@@ -1332,27 +1440,30 @@ annotateBtn.onclick = function() {
     closeCommentDialog();
   }
 };
-toolbar.appendChild(annotateBtn);
+modeGroup.appendChild(annotateBtn);
+modeGroup.appendChild(makeDivider());
 
+var bulkBtn = makeModeBtn();
+bulkBtn.textContent = "\\uC815\\uB9AC \\u25BE"; /* 정리 ▾ */
+bulkBtn.onclick = function(e) { e.stopPropagation(); toggleBulkMenu(); };
+modeGroup.appendChild(bulkBtn);
+toolbar.appendChild(modeGroup);
+
+/* CTA capsule — inverts on hover */
 var promptBtn = document.createElement("button");
 promptBtn.setAttribute(MARKER, "btn");
 promptBtn.textContent = "Copy Prompt";
-promptBtn.style.cssText = toggleBtn.style.cssText;
+promptBtn.style.cssText = "padding:12px 20px;border:none;border-radius:999px;background:" + C_INK + ";color:#f4f4f0;font:600 13px " + F_SANS + ";letter-spacing:0.01em;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,0.35);transition:background 0.18s ease,color 0.18s ease;white-space:nowrap;";
+promptBtn.onmouseenter = function() { promptBtn.style.background = "#f4f4f0"; promptBtn.style.color = C_TXT; };
+promptBtn.onmouseleave = function() { promptBtn.style.background = C_INK; promptBtn.style.color = "#f4f4f0"; };
 promptBtn.onclick = copyPrompt;
 toolbar.appendChild(promptBtn);
-
-var bulkBtn = document.createElement("button");
-bulkBtn.setAttribute(MARKER, "btn");
-bulkBtn.textContent = "\\uC815\\uB9AC \\u25BE"; /* 정리 ▾ */
-bulkBtn.style.cssText = toggleBtn.style.cssText;
-bulkBtn.onclick = function(e) { e.stopPropagation(); toggleBulkMenu(); };
-toolbar.appendChild(bulkBtn);
 document.documentElement.appendChild(toolbar);
 
 /* ── Bulk Manage Menu (page / all resolve & delete) ───────────── */
 var bulkMenu = document.createElement("div");
 bulkMenu.setAttribute(MARKER, "bulk-menu");
-bulkMenu.style.cssText = "position:fixed;bottom:56px;right:16px;z-index:100004;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;width:230px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;display:none;";
+bulkMenu.style.cssText = "position:fixed;bottom:74px;right:18px;z-index:100004;background:" + C_CARD + ";border-radius:16px;padding:8px;width:236px;box-shadow:0 16px 44px rgba(0,0,0,0.35);pointer-events:auto;font-family:" + F_MONO + ";display:none;transition:right 0.3s cubic-bezier(0.16,1,0.3,1);";
 document.documentElement.appendChild(bulkMenu);
 var bulkArmed = null; /* which delete action is armed for confirm */
 var bulkArmTimer = null;
@@ -1396,8 +1507,11 @@ function clearBulkArm() {
 
 function bulkSectionLabel(text) {
   var el = document.createElement("div");
-  el.style.cssText = "font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:6px 8px 3px;";
-  el.textContent = text;
+  el.style.cssText = "display:flex;align-items:center;gap:6px;font:700 9px " + F_MONO + ";color:" + C_MUTE_L + ";text-transform:uppercase;letter-spacing:0.14em;padding:8px 10px 4px;";
+  var sq = document.createElement("span");
+  sq.style.cssText = "width:5px;height:5px;background:" + C_RED + ";display:inline-block;flex:none;";
+  el.appendChild(sq);
+  el.appendChild(document.createTextNode(text));
   return el;
 }
 
@@ -1406,19 +1520,19 @@ function bulkRow(key, label, count, accent, action) {
   row.setAttribute(MARKER, "btn");
   var disabled = count === 0;
   var armed = bulkArmed === key;
-  row.style.cssText = "display:flex;justify-content:space-between;align-items:center;width:100%;box-sizing:border-box;padding:7px 8px;border:none;border-radius:5px;background:"
-    + (armed ? "#7f1d1d" : "transparent") + ";color:"
-    + (disabled ? "#475569" : armed ? "#fecaca" : accent) + ";cursor:"
-    + (disabled ? "default" : "pointer") + ";font:12px system-ui,sans-serif;text-align:left;";
+  row.style.cssText = "display:flex;justify-content:space-between;align-items:center;width:100%;box-sizing:border-box;padding:8px 10px;border:none;border-radius:9px;transition:background 0.15s ease;background:"
+    + (armed ? C_RED : "transparent") + ";color:"
+    + (disabled ? "#b8b8b0" : armed ? "#fff" : accent) + ";cursor:"
+    + (disabled ? "default" : "pointer") + ";font:12px " + F_MONO + ";text-align:left;";
   var left = document.createElement("span");
   left.textContent = armed ? "\\uD55C \\uBC88 \\uB354 \\uD074\\uB9AD \\u2192 \\uC0AD\\uC81C" : label; /* 한 번 더 클릭 → 삭제 */
   var right = document.createElement("span");
-  right.style.cssText = "font-size:11px;color:" + (disabled ? "#475569" : "#94a3b8") + ";";
+  right.style.cssText = "font-size:11px;color:" + (disabled ? "#b8b8b0" : armed ? "#fff" : "#8a8a84") + ";";
   right.textContent = String(count);
   row.appendChild(left);
   row.appendChild(right);
   if (!disabled) {
-    row.onmouseenter = function() { if (bulkArmed !== key) row.style.background = "#1e293b"; };
+    row.onmouseenter = function() { if (bulkArmed !== key) row.style.background = C_WELL; };
     row.onmouseleave = function() { if (bulkArmed !== key) row.style.background = "transparent"; };
     row.onclick = function(e) { e.stopPropagation(); action(); };
   }
@@ -1430,12 +1544,12 @@ function renderBulkMenu() {
   var c = bulkCounts();
 
   bulkMenu.appendChild(bulkSectionLabel("\\uC774 \\uD398\\uC774\\uC9C0")); /* 이 페이지 */
-  bulkMenu.appendChild(bulkRow("page-resolve", "\\u2713 \\uD574\\uACB0", c.pageOpen, "#4ade80", function() {
+  bulkMenu.appendChild(bulkRow("page-resolve", "\\u2713 \\uD574\\uACB0", c.pageOpen, C_TXT, function() {
     wsSend("annotations_bulk_update", { ids: bulkPageIds(true), status: "resolved" });
     hideBulkMenu();
     showToast("\\uC774 \\uD398\\uC774\\uC9C0 " + c.pageOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
   }));
-  bulkMenu.appendChild(bulkRow("page-delete", "\\uD83D\\uDDD1 \\uC0AD\\uC81C", c.pageTotal, "#f87171", function() {
+  bulkMenu.appendChild(bulkRow("page-delete", "\\u2715 \\uC0AD\\uC81C", c.pageTotal, C_RED, function() {
     if (bulkArmed !== "page-delete") { armBulk("page-delete"); return; }
     var n = c.pageTotal;
     wsSend("annotations_bulk_remove", { ids: bulkPageIds(false) });
@@ -1444,16 +1558,16 @@ function renderBulkMenu() {
   }));
 
   var div = document.createElement("div");
-  div.style.cssText = "height:1px;background:#1e293b;margin:4px 6px;";
+  div.style.cssText = "height:1px;background:#e0ded6;margin:5px 8px;";
   bulkMenu.appendChild(div);
 
   bulkMenu.appendChild(bulkSectionLabel("\\uC804\\uCCB4 (\\uBAA8\\uB4E0 \\uD398\\uC774\\uC9C0)")); /* 전체 (모든 페이지) */
-  bulkMenu.appendChild(bulkRow("all-resolve", "\\u2713 \\uD574\\uACB0", c.allOpen, "#4ade80", function() {
+  bulkMenu.appendChild(bulkRow("all-resolve", "\\u2713 \\uD574\\uACB0", c.allOpen, C_TXT, function() {
     wsSend("annotations_bulk_update", { ids: bulkAllIds(true), status: "resolved" });
     hideBulkMenu();
     showToast("\\uC804\\uCCB4 " + c.allOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
   }));
-  bulkMenu.appendChild(bulkRow("all-delete", "\\uD83D\\uDDD1 \\uC0AD\\uC81C", c.allTotal, "#f87171", function() {
+  bulkMenu.appendChild(bulkRow("all-delete", "\\u2715 \\uC0AD\\uC81C", c.allTotal, C_RED, function() {
     if (bulkArmed !== "all-delete") { armBulk("all-delete"); return; }
     var n = c.allTotal;
     wsSend("annotations_bulk_remove", { ids: bulkAllIds(false) });
@@ -1490,29 +1604,22 @@ var observer = new MutationObserver(function(mutations) {
 });
 observer.observe(document.documentElement, { childList: true });
 
+function setModeBtnState(btn, label, on) {
+  while (btn.firstChild) btn.removeChild(btn.firstChild);
+  if (on) {
+    var dot = document.createElement("span");
+    dot.style.cssText = "display:inline-block;width:6px;height:6px;border-radius:50%;background:" + C_RED + ";margin-right:7px;vertical-align:1px;";
+    btn.appendChild(dot);
+  }
+  btn.appendChild(document.createTextNode(label));
+  btn.style.color = on ? "#f4f4f0" : C_MUTE_D;
+  btn.style.background = on ? "#2a2a26" : "transparent";
+}
+
 function updateToolbarState() {
-  if (inspectorEnabled) {
-    toggleBtn.textContent = "Inspect ON";
-    toggleBtn.style.borderColor = "#3b82f6";
-    toggleBtn.style.backgroundColor = "#1e3a5f";
-    toggleBtn.style.color = "#60a5fa";
-  } else {
-    toggleBtn.textContent = "Inspect OFF";
-    toggleBtn.style.borderColor = "#334155";
-    toggleBtn.style.backgroundColor = "#0f172a";
-    toggleBtn.style.color = "#94a3b8";
-  }
-  if (annotateEnabled) {
-    annotateBtn.textContent = "Annotate ON";
-    annotateBtn.style.borderColor = "#f59e0b";
-    annotateBtn.style.backgroundColor = "#451a03";
-    annotateBtn.style.color = "#fbbf24";
-  } else {
-    annotateBtn.textContent = "Annotate OFF";
-    annotateBtn.style.borderColor = "#334155";
-    annotateBtn.style.backgroundColor = "#0f172a";
-    annotateBtn.style.color = "#94a3b8";
-  }
+  setModeBtnState(toggleBtn, "Inspect", inspectorEnabled);
+  setModeBtnState(annotateBtn, "Annotate", annotateEnabled);
+
   var openCount = 0;
   var pageTotal = 0;
   for (var i = 0; i < annotations.length; i++) {
@@ -1520,17 +1627,9 @@ function updateToolbarState() {
     pageTotal++;
     if (annotations[i].status === "open") openCount++;
   }
-  if (pageTotal > 0) {
-    promptBtn.textContent = "Copy Prompt (" + openCount + "/" + pageTotal + ")";
-    promptBtn.style.borderColor = "#f59e0b";
-    promptBtn.style.color = "#fbbf24";
-    promptBtn.style.backgroundColor = "#0f172a";
-  } else {
-    promptBtn.textContent = "Copy Prompt";
-    promptBtn.style.borderColor = "#334155";
-    promptBtn.style.color = "#94a3b8";
-    promptBtn.style.backgroundColor = "#0f172a";
-  }
+  promptBtn.textContent = pageTotal > 0
+    ? "Copy Prompt (" + openCount + "/" + pageTotal + ")"
+    : "Copy Prompt";
   /* keep bulk menu counts fresh while open */
   if (bulkMenu && bulkMenu.style.display !== "none") renderBulkMenu();
 }
@@ -1543,12 +1642,12 @@ function isOwnElement(el) {
 function updateLabel(info) {
   while (labelEl.firstChild) labelEl.removeChild(labelEl.firstChild);
   var termSpan = document.createElement("span");
-  termSpan.style.cssText = "color:#60a5fa;margin-right:6px;";
+  termSpan.style.cssText = "color:" + C_RED + ";margin-right:8px;font-weight:700;";
   termSpan.textContent = info.uiTerm;
   labelEl.appendChild(termSpan);
   if (info.elementName && info.elementName.primary && info.elementName.primarySource !== "tag") {
     var nameSpan = document.createElement("span");
-    nameSpan.style.cssText = "color:#fbbf24;margin-right:6px;";
+    nameSpan.style.cssText = "color:#f4f4f0;margin-right:8px;";
     var nameTxt = info.elementName.primary;
     if (nameTxt.length > 32) nameTxt = nameTxt.slice(0, 32) + "\\u2026";
     nameSpan.textContent = nameTxt;
@@ -1556,7 +1655,7 @@ function updateLabel(info) {
   }
   if (info.sourceLocation) {
     var srcSpan = document.createElement("span");
-    srcSpan.style.color = "#94a3b8";
+    srcSpan.style.color = C_MUTE_D;
     srcSpan.textContent = info.sourceLocation.file + ":" + info.sourceLocation.line;
     labelEl.appendChild(srcSpan);
   }
@@ -1610,7 +1709,7 @@ document.addEventListener("mousemove", function(e) {
       if (!marqueeEl) {
         marqueeEl = document.createElement("div");
         marqueeEl.setAttribute(MARKER, "marquee");
-        marqueeEl.style.cssText = "position:fixed;border:1.5px dashed #f59e0b;background:rgba(245,158,11,0.08);pointer-events:none;z-index:100001;";
+        marqueeEl.style.cssText = "position:fixed;border:1.5px dashed " + C_RED + ";background:rgba(255,48,0,0.05);pointer-events:none;z-index:100001;";
         document.documentElement.appendChild(marqueeEl);
       }
       hoverBox.style.display = "none";
@@ -1627,8 +1726,8 @@ document.addEventListener("mousemove", function(e) {
   if (isOwnElement(target)) { hoverBox.style.display = "none"; return; }
   var rect = target.getBoundingClientRect();
   hoverBox.style.display = "block";
-  hoverBox.style.borderColor = annotateEnabled ? "#f59e0b" : "#3b82f6";
-  hoverBox.style.background = annotateEnabled ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.1)";
+  hoverBox.style.borderColor = annotateEnabled ? C_RED : "#141414";
+  hoverBox.style.background = annotateEnabled ? "rgba(255,48,0,0.05)" : "rgba(20,20,20,0.05)";
   hoverBox.style.left = rect.x + "px";
   hoverBox.style.top = rect.y + "px";
   hoverBox.style.width = rect.width + "px";
@@ -1705,6 +1804,7 @@ document.addEventListener("keydown", function(e) {
 }, true);
 
 /* ── Init ─────────────────────────────────────────────────────── */
+updateToolbarState();
 connectWS();
 console.log("[Gemini Inspector] Injected. WSBridge port: " + WS_PORT);
 })();`;
