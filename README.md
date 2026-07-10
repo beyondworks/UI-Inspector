@@ -53,7 +53,7 @@ Restart Claude Code.
 
 ## Annotations — Agentation-style workflow
 
-The injected toolbar (bottom-right) has three buttons: **Inspect**, **Annotate**, **Copy Prompt (open/total)**.
+The injected toolbar (bottom-right) has four buttons: **Inspect**, **Annotate**, **Copy Prompt (open/total)**, and **정리 ▾** (bulk manage). Press **ESC** any time to exit Inspect/Annotate mode (it first closes an open dialog, pin popup, or menu).
 
 1. Toggle **Annotate** and click any element — a comment dialog opens (⌘+Enter to save)
 2. A numbered amber pin appears. Add as many annotations as you want — **multiple pins on the same element are supported** (they stack side-by-side)
@@ -63,6 +63,7 @@ The injected toolbar (bottom-right) has three buttons: **Inspect**, **Annotate**
 6. Annotations live on the server, so they survive page reloads, navigation, and HMR. Pins re-anchor via `data-at` → CSS path → selector
 7. **Pins are page-scoped**: each pin only renders on the page (pathname) where it was created — navigating elsewhere hides it, coming back restores it. SPA route changes (pushState) are detected without a reload. The toolbar count and **Copy Prompt** cover the current page; `annotation_list` / `annotation_to_prompt` still return every page (each item carries its `pageUrl`)
 8. No MCP? Press **Copy Prompt** to copy the current page's annotation set as a markdown task list for any AI coding agent
+9. **Bulk manage (정리 ▾)**: resolve or delete all annotations at once, scoped to **this page** or **all pages**. Delete is two-click (arms → confirm) to avoid accidents. Counts update live as you work
 
 Each annotation carries: comment, status, element name, robust CSS path, source location (`data-at`), UI term, computed styles, text, size, and a truncated HTML snippet.
 

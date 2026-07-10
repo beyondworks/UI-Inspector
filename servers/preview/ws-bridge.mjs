@@ -134,6 +134,33 @@ export class WSBridge {
         if (this.annotations.delete(d.id)) this._broadcastAnnotations();
         break;
       }
+      case "annotations_bulk_update": {
+        const d = msg.data || {};
+        const ids = Array.isArray(d.ids) ? d.ids : [];
+        const status = d.status === "open" ? "open" : "resolved";
+        const now = new Date().toISOString();
+        let changed = 0;
+        for (const id of ids) {
+          const ann = this.annotations.get(id);
+          if (!ann) continue;
+          ann.status = status;
+          if (status === "open") ann.resolvedNote = null;
+          ann.updatedAt = now;
+          changed++;
+        }
+        if (changed) this._broadcastAnnotations();
+        break;
+      }
+      case "annotations_bulk_remove": {
+        const d = msg.data || {};
+        const ids = Array.isArray(d.ids) ? d.ids : [];
+        let removed = 0;
+        for (const id of ids) {
+          if (this.annotations.delete(id)) removed++;
+        }
+        if (removed) this._broadcastAnnotations();
+        break;
+      }
       case "annotations_clear":
         this.annotations.clear();
         this._broadcastAnnotations();

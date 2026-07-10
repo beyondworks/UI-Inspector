@@ -741,7 +741,7 @@ function showToast(text) {
   if (toastTimer) clearTimeout(toastTimer);
   toastEl = document.createElement("div");
   toastEl.setAttribute(MARKER, "toast");
-  toastEl.style.cssText = "position:fixed;bottom:64px;right:16px;background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:6px;font:12px system-ui,sans-serif;z-index:100005;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid #334155;pointer-events:none;";
+  toastEl.style.cssText = "position:fixed;bottom:16px;left:16px;background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:6px;font:12px system-ui,sans-serif;z-index:100006;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid #334155;pointer-events:none;";
   toastEl.textContent = text;
   document.documentElement.appendChild(toastEl);
   toastTimer = setTimeout(function() {
@@ -1340,10 +1340,149 @@ promptBtn.textContent = "Copy Prompt";
 promptBtn.style.cssText = toggleBtn.style.cssText;
 promptBtn.onclick = copyPrompt;
 toolbar.appendChild(promptBtn);
+
+var bulkBtn = document.createElement("button");
+bulkBtn.setAttribute(MARKER, "btn");
+bulkBtn.textContent = "\\uC815\\uB9AC \\u25BE"; /* 정리 ▾ */
+bulkBtn.style.cssText = toggleBtn.style.cssText;
+bulkBtn.onclick = function(e) { e.stopPropagation(); toggleBulkMenu(); };
+toolbar.appendChild(bulkBtn);
 document.documentElement.appendChild(toolbar);
 
+/* ── Bulk Manage Menu (page / all resolve & delete) ───────────── */
+var bulkMenu = document.createElement("div");
+bulkMenu.setAttribute(MARKER, "bulk-menu");
+bulkMenu.style.cssText = "position:fixed;bottom:56px;right:16px;z-index:100004;background:#0f172a;border:1px solid #334155;border-radius:8px;padding:6px;width:230px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;display:none;";
+document.documentElement.appendChild(bulkMenu);
+var bulkArmed = null; /* which delete action is armed for confirm */
+var bulkArmTimer = null;
+
+function bulkPageIds(openOnly) {
+  var ids = [];
+  for (var i = 0; i < annotations.length; i++) {
+    var a = annotations[i];
+    if (!samePage(a)) continue;
+    if (openOnly && a.status !== "open") continue;
+    ids.push(a.id);
+  }
+  return ids;
+}
+function bulkAllIds(openOnly) {
+  var ids = [];
+  for (var i = 0; i < annotations.length; i++) {
+    if (openOnly && annotations[i].status !== "open") continue;
+    ids.push(annotations[i].id);
+  }
+  return ids;
+}
+function bulkCounts() {
+  var pageOpen = 0, pageTotal = 0, allOpen = 0, allTotal = 0;
+  for (var i = 0; i < annotations.length; i++) {
+    var a = annotations[i];
+    allTotal++;
+    if (a.status === "open") allOpen++;
+    if (samePage(a)) {
+      pageTotal++;
+      if (a.status === "open") pageOpen++;
+    }
+  }
+  return { pageOpen: pageOpen, pageTotal: pageTotal, allOpen: allOpen, allTotal: allTotal };
+}
+
+function clearBulkArm() {
+  bulkArmed = null;
+  if (bulkArmTimer) { clearTimeout(bulkArmTimer); bulkArmTimer = null; }
+}
+
+function bulkSectionLabel(text) {
+  var el = document.createElement("div");
+  el.style.cssText = "font-size:9px;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;padding:6px 8px 3px;";
+  el.textContent = text;
+  return el;
+}
+
+function bulkRow(key, label, count, accent, action) {
+  var row = document.createElement("button");
+  row.setAttribute(MARKER, "btn");
+  var disabled = count === 0;
+  var armed = bulkArmed === key;
+  row.style.cssText = "display:flex;justify-content:space-between;align-items:center;width:100%;box-sizing:border-box;padding:7px 8px;border:none;border-radius:5px;background:"
+    + (armed ? "#7f1d1d" : "transparent") + ";color:"
+    + (disabled ? "#475569" : armed ? "#fecaca" : accent) + ";cursor:"
+    + (disabled ? "default" : "pointer") + ";font:12px system-ui,sans-serif;text-align:left;";
+  var left = document.createElement("span");
+  left.textContent = armed ? "\\uD55C \\uBC88 \\uB354 \\uD074\\uB9AD \\u2192 \\uC0AD\\uC81C" : label; /* 한 번 더 클릭 → 삭제 */
+  var right = document.createElement("span");
+  right.style.cssText = "font-size:11px;color:" + (disabled ? "#475569" : "#94a3b8") + ";";
+  right.textContent = String(count);
+  row.appendChild(left);
+  row.appendChild(right);
+  if (!disabled) {
+    row.onmouseenter = function() { if (bulkArmed !== key) row.style.background = "#1e293b"; };
+    row.onmouseleave = function() { if (bulkArmed !== key) row.style.background = "transparent"; };
+    row.onclick = function(e) { e.stopPropagation(); action(); };
+  }
+  return row;
+}
+
+function renderBulkMenu() {
+  while (bulkMenu.firstChild) bulkMenu.removeChild(bulkMenu.firstChild);
+  var c = bulkCounts();
+
+  bulkMenu.appendChild(bulkSectionLabel("\\uC774 \\uD398\\uC774\\uC9C0")); /* 이 페이지 */
+  bulkMenu.appendChild(bulkRow("page-resolve", "\\u2713 \\uD574\\uACB0", c.pageOpen, "#4ade80", function() {
+    wsSend("annotations_bulk_update", { ids: bulkPageIds(true), status: "resolved" });
+    hideBulkMenu();
+    showToast("\\uC774 \\uD398\\uC774\\uC9C0 " + c.pageOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
+  }));
+  bulkMenu.appendChild(bulkRow("page-delete", "\\uD83D\\uDDD1 \\uC0AD\\uC81C", c.pageTotal, "#f87171", function() {
+    if (bulkArmed !== "page-delete") { armBulk("page-delete"); return; }
+    var n = c.pageTotal;
+    wsSend("annotations_bulk_remove", { ids: bulkPageIds(false) });
+    hideBulkMenu();
+    showToast("\\uC774 \\uD398\\uC774\\uC9C0 " + n + "\\uAC1C \\uC0AD\\uC81C\\uB428");
+  }));
+
+  var div = document.createElement("div");
+  div.style.cssText = "height:1px;background:#1e293b;margin:4px 6px;";
+  bulkMenu.appendChild(div);
+
+  bulkMenu.appendChild(bulkSectionLabel("\\uC804\\uCCB4 (\\uBAA8\\uB4E0 \\uD398\\uC774\\uC9C0)")); /* 전체 (모든 페이지) */
+  bulkMenu.appendChild(bulkRow("all-resolve", "\\u2713 \\uD574\\uACB0", c.allOpen, "#4ade80", function() {
+    wsSend("annotations_bulk_update", { ids: bulkAllIds(true), status: "resolved" });
+    hideBulkMenu();
+    showToast("\\uC804\\uCCB4 " + c.allOpen + "\\uAC1C \\uD574\\uACB0\\uB428");
+  }));
+  bulkMenu.appendChild(bulkRow("all-delete", "\\uD83D\\uDDD1 \\uC0AD\\uC81C", c.allTotal, "#f87171", function() {
+    if (bulkArmed !== "all-delete") { armBulk("all-delete"); return; }
+    var n = c.allTotal;
+    wsSend("annotations_bulk_remove", { ids: bulkAllIds(false) });
+    hideBulkMenu();
+    showToast("\\uC804\\uCCB4 " + n + "\\uAC1C \\uC0AD\\uC81C\\uB428");
+  }));
+}
+
+function armBulk(key) {
+  bulkArmed = key;
+  if (bulkArmTimer) clearTimeout(bulkArmTimer);
+  bulkArmTimer = setTimeout(function() { clearBulkArm(); renderBulkMenu(); }, 3000);
+  renderBulkMenu();
+}
+function showBulkMenu() { clearBulkArm(); renderBulkMenu(); bulkMenu.style.display = "block"; }
+function hideBulkMenu() { clearBulkArm(); bulkMenu.style.display = "none"; }
+function toggleBulkMenu() {
+  if (bulkMenu.style.display === "none") showBulkMenu();
+  else hideBulkMenu();
+}
+/* close menu on outside click */
+document.addEventListener("click", function(e) {
+  if (bulkMenu.style.display === "none") return;
+  if (e.target === bulkBtn || (e.target.closest && e.target.closest("[" + MARKER + "=\\"bulk-menu\\"]"))) return;
+  hideBulkMenu();
+}, false);
+
 /* ── DOM Guard: re-attach if framework removes our elements ── */
-var guardEls = [overlay, panel, toolbar, pinLayer];
+var guardEls = [overlay, panel, toolbar, pinLayer, bulkMenu];
 var observer = new MutationObserver(function(mutations) {
   for (var i = 0; i < guardEls.length; i++) {
     ensureAttached(guardEls[i]);
@@ -1392,6 +1531,8 @@ function updateToolbarState() {
     promptBtn.style.color = "#94a3b8";
     promptBtn.style.backgroundColor = "#0f172a";
   }
+  /* keep bulk menu counts fresh while open */
+  if (bulkMenu && bulkMenu.style.display !== "none") renderBulkMenu();
 }
 
 /* ── Event Handlers ───────────────────────────────────────────── */
@@ -1526,6 +1667,40 @@ document.addEventListener("click", function(e) {
     wsSend("element_selected", info);
   } catch(err) {
     console.error("[Gemini Inspector] Click handler error:", err);
+  }
+}, true);
+
+/* ── ESC: close dialogs / menu, then exit inspector & annotate ── */
+document.addEventListener("keydown", function(e) {
+  if (e.key !== "Escape" && e.keyCode !== 27) return;
+
+  /* 1) an open dialog or pin popup takes priority */
+  if (annDialog || annPopup) {
+    closeCommentDialog();
+    closePinPopup();
+    e.preventDefault();
+    return;
+  }
+  /* 2) an open bulk menu */
+  if (bulkMenu && bulkMenu.style.display !== "none") {
+    hideBulkMenu();
+    e.preventDefault();
+    return;
+  }
+  /* 3) exit whichever modes are active */
+  if (inspectorEnabled || annotateEnabled) {
+    if (inspectorEnabled) {
+      inspectorEnabled = false;
+      wsSend("inspector_state", { enabled: false });
+      hidePanel();
+    }
+    annotateEnabled = false;
+    hoverBox.style.display = "none";
+    labelEl.style.display = "none";
+    closeCommentDialog();
+    updateToolbarState();
+    showToast("\\uC778\\uC2A4\\uD399\\uD130 \\uD574\\uC81C (ESC)"); /* 인스펙터 해제 */
+    e.preventDefault();
   }
 }, true);
 
