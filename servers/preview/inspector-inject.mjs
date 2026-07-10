@@ -749,6 +749,16 @@ function showToast(text) {
   }, 2200);
 }
 
+/* ── Annotations: page scoping ────────────────────────────────── */
+/* Pins only render on the page they were created on (pathname match).
+   Annotations from other pages stay on the server and in agent tools. */
+function samePage(ann) {
+  if (!ann.pageUrl) return true;
+  try {
+    return new URL(ann.pageUrl).pathname === location.pathname;
+  } catch(e) { return true; }
+}
+
 /* ── Annotations: element re-anchoring ────────────────────────── */
 function findAnnotationEl(ann) {
   var e = ann.element || {};
@@ -789,6 +799,7 @@ function renderPins() {
   var groupCounts = {};
   for (var i = 0; i < annotations.length; i++) {
     var ann = annotations[i];
+    if (!samePage(ann)) { ann._el = null; continue; }
     var el = findAnnotationEl(ann);
     ann._el = el;
     var key = "orphan";
@@ -820,8 +831,19 @@ function positionPins() {
   }
 }
 
+var lastPinPath = location.pathname;
 (function pinLoop() {
-  try { if (annotations.length > 0) positionPins(); } catch(e) {}
+  try {
+    // SPA route change (pushState/popstate): re-filter pins for the new page
+    if (location.pathname !== lastPinPath) {
+      lastPinPath = location.pathname;
+      closePinPopup();
+      closeCommentDialog();
+      renderPins();
+    } else if (annotations.length > 0) {
+      positionPins();
+    }
+  } catch(e) {}
   requestAnimationFrame(pinLoop);
 })();
 
@@ -976,11 +998,15 @@ function openPinPopup(ann, pin) {
 
 /* ── Annotations: agent prompt builder (Copy Prompt) ──────────── */
 function buildPrompt() {
-  var open = [];
-  for (var i = 0; i < annotations.length; i++) {
-    if (annotations[i].status === "open") open.push(annotations[i]);
+  var pageAnns = [];
+  for (var k = 0; k < annotations.length; k++) {
+    if (samePage(annotations[k])) pageAnns.push(annotations[k]);
   }
-  var list = open.length ? open : annotations;
+  var open = [];
+  for (var i = 0; i < pageAnns.length; i++) {
+    if (pageAnns[i].status === "open") open.push(pageAnns[i]);
+  }
+  var list = open.length ? open : pageAnns;
   var L = [];
   L.push("# UI Annotations (" + list.length + ")");
   L.push("");
@@ -1011,7 +1037,11 @@ function buildPrompt() {
 }
 
 function copyPrompt() {
-  if (annotations.length === 0) { showToast("Annotation\\uC774 \\uC5C6\\uC2B5\\uB2C8\\uB2E4"); return; }
+  var pageCount = 0;
+  for (var i = 0; i < annotations.length; i++) {
+    if (samePage(annotations[i])) pageCount++;
+  }
+  if (pageCount === 0) { showToast("\\uC774 \\uD398\\uC774\\uC9C0\\uC5D0 Annotation\\uC774 \\uC5C6\\uC2B5\\uB2C8\\uB2E4"); return; }
   var text = buildPrompt();
   function fallbackCopy() {
     var ta = document.createElement("textarea");
@@ -1163,11 +1193,14 @@ function updateToolbarState() {
     annotateBtn.style.color = "#94a3b8";
   }
   var openCount = 0;
+  var pageTotal = 0;
   for (var i = 0; i < annotations.length; i++) {
+    if (!samePage(annotations[i])) continue;
+    pageTotal++;
     if (annotations[i].status === "open") openCount++;
   }
-  if (annotations.length > 0) {
-    promptBtn.textContent = "Copy Prompt (" + openCount + "/" + annotations.length + ")";
+  if (pageTotal > 0) {
+    promptBtn.textContent = "Copy Prompt (" + openCount + "/" + pageTotal + ")";
     promptBtn.style.borderColor = "#f59e0b";
     promptBtn.style.color = "#fbbf24";
     promptBtn.style.backgroundColor = "#0f172a";
