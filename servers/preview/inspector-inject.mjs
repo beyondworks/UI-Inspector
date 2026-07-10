@@ -760,8 +760,8 @@ function samePage(ann) {
 }
 
 /* ── Annotations: element re-anchoring ────────────────────────── */
-function findAnnotationEl(ann) {
-  var e = ann.element || {};
+function findElementByInfo(e) {
+  if (!e) return null;
   var el = null;
   if (e.sourceLocation && e.sourceLocation.file) {
     try {
@@ -773,6 +773,10 @@ function findAnnotationEl(ann) {
     try { el = document.querySelector(e.elementName.selector); } catch(err) {}
   }
   return el;
+}
+
+function findAnnotationEl(ann) {
+  return findElementByInfo(ann.element || {});
 }
 
 /* ── Annotations: pins ────────────────────────────────────────── */
@@ -940,6 +944,19 @@ function openPinPopup(ann, pin) {
     + (resolved ? "background:#052e16;color:#4ade80;" : "background:#451a03;color:#fbbf24;");
   statusBadge.textContent = resolved ? "resolved" : "open";
   head.appendChild(statusBadge);
+  if (ann.elements && ann.elements.length > 1) {
+    var groupChip = document.createElement("span");
+    groupChip.style.cssText = "font-size:9px;padding:1px 6px;border-radius:3px;background:#1e3a5f;color:#60a5fa;";
+    groupChip.textContent = "\\uC694\\uC18C " + ann.elements.length + "\\uAC1C";
+    head.appendChild(groupChip);
+    /* show which elements belong to this group */
+    var groupEls = [];
+    for (var gi = 0; gi < ann.elements.length; gi++) {
+      var ge = findElementByInfo(ann.elements[gi]);
+      if (ge) groupEls.push(ge);
+    }
+    if (groupEls.length) outlineElements(groupEls, 1600);
+  }
   var elName = ann.element && ann.element.elementName ? ann.element.elementName.primary : "";
   if (elName) {
     var nameSpan = document.createElement("span");
@@ -996,6 +1013,158 @@ function openPinPopup(ann, pin) {
   annPopup = box;
 }
 
+/* ── Annotate: drag marquee multi-select ──────────────────────── */
+var marqueeEl = null;
+var dragStart = null;
+var didDrag = false;
+var MAX_GROUP = 30;
+
+function collectElementsInRect(rect) {
+  if (!document.body) return [];
+  var all = document.body.querySelectorAll("*");
+  var contained = [];
+  for (var i = 0; i < all.length; i++) {
+    var el = all[i];
+    if (isOwnElement(el)) continue;
+    var tag = el.tagName.toLowerCase();
+    if (tag === "script" || tag === "style" || tag === "link" || tag === "meta" || tag === "noscript") continue;
+    var r = el.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) continue;
+    if (r.left >= rect.left && r.right <= rect.right && r.top >= rect.top && r.bottom <= rect.bottom) {
+      contained.push(el);
+    }
+  }
+  /* keep outermost only: drop elements whose ancestor is also selected */
+  function outermost(pool) {
+    var out = [];
+    for (var j = 0; j < pool.length; j++) {
+      var nested = false;
+      for (var k = 0; k < pool.length; k++) {
+        if (k !== j && pool[k].contains(pool[j])) { nested = true; break; }
+      }
+      if (!nested) out.push(pool[j]);
+    }
+    return out;
+  }
+
+  /* drag means "select multiple": if the result collapses to a single
+     wrapper/container, descend into its contained elements until the
+     selection has 2+ items (or nothing left to descend into) */
+  var pool = contained;
+  var outer = outermost(pool);
+  var depth = 0;
+  while (outer.length === 1 && depth < 10) {
+    var rest = [];
+    for (var m = 0; m < pool.length; m++) {
+      if (pool[m] !== outer[0]) rest.push(pool[m]);
+    }
+    if (rest.length < 2) break;
+    pool = rest;
+    outer = outermost(pool);
+    depth++;
+  }
+  return outer;
+}
+
+function outlineElements(els, ms) {
+  var boxes = [];
+  for (var i = 0; i < els.length; i++) {
+    var el = els[i];
+    if (!el || !document.documentElement.contains(el)) continue;
+    var r = el.getBoundingClientRect();
+    var b = document.createElement("div");
+    b.setAttribute(MARKER, "group-outline");
+    b.style.cssText = "position:fixed;border:2px solid #f59e0b;border-radius:3px;background:rgba(245,158,11,0.08);pointer-events:none;z-index:100000;transition:opacity 0.3s;"
+      + "left:" + r.x + "px;top:" + r.y + "px;width:" + r.width + "px;height:" + r.height + "px;";
+    document.documentElement.appendChild(b);
+    boxes.push(b);
+  }
+  setTimeout(function() {
+    for (var j = 0; j < boxes.length; j++) boxes[j].style.opacity = "0";
+    setTimeout(function() {
+      for (var j = 0; j < boxes.length; j++) boxes[j].remove();
+    }, 350);
+  }, ms || 1600);
+  return boxes;
+}
+
+function openGroupCommentDialog(targets, x, y) {
+  closeCommentDialog();
+  closePinPopup();
+
+  var truncated = targets.length > MAX_GROUP;
+  var picked = targets.slice(0, MAX_GROUP);
+  var infos = [];
+  for (var i = 0; i < picked.length; i++) {
+    try { infos.push(getElementInfo(picked[i])); } catch(e) {}
+  }
+  if (infos.length === 0) return;
+  outlineElements(picked, 2000);
+
+  var box = document.createElement("div");
+  box.setAttribute(MARKER, "dialog");
+  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:10px;width:300px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+
+  var title = document.createElement("div");
+  title.style.cssText = "font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px;";
+  title.textContent = "\\uC694\\uC18C " + infos.length + "\\uAC1C \\uC120\\uD0DD\\uB428" + (truncated ? " (\\uCD5C\\uB300 " + MAX_GROUP + "\\uAC1C\\uAE4C\\uC9C0)" : "");
+  box.appendChild(title);
+
+  var listEl = document.createElement("div");
+  listEl.style.cssText = "font-size:10px;color:#94a3b8;line-height:1.6;max-height:72px;overflow-y:auto;background:#0c1524;border-radius:4px;padding:5px 8px;margin-bottom:6px;word-break:break-all;";
+  var previewCount = Math.min(infos.length, 8);
+  for (var p = 0; p < previewCount; p++) {
+    var row = document.createElement("div");
+    var nm = infos[p].elementName || {};
+    row.textContent = (p + 1) + ". " + (nm.primary || infos[p].tag) + " \\u00b7 " + infos[p].uiTerm;
+    listEl.appendChild(row);
+  }
+  if (infos.length > previewCount) {
+    var more = document.createElement("div");
+    more.textContent = "\\u2026 \\uC678 " + (infos.length - previewCount) + "\\uAC1C";
+    listEl.appendChild(more);
+  }
+  box.appendChild(listEl);
+
+  var ta = document.createElement("textarea");
+  ta.placeholder = "\\uC120\\uD0DD\\uB41C \\uC694\\uC18C\\uB4E4\\uC5D0 \\uB300\\uD55C \\uC694\\uCCAD\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
+  ta.style.cssText = "width:100%;height:56px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  box.appendChild(ta);
+
+  var row2 = document.createElement("div");
+  row2.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
+  var cancelBtn = makeSmallBtn("\\uCDE8\\uC18C", false);
+  cancelBtn.onclick = function() { closeCommentDialog(); };
+  var saveBtn = makeSmallBtn("\\uCD94\\uAC00", true);
+  function save() {
+    var comment = ta.value.trim();
+    if (!comment) { ta.focus(); return; }
+    wsSend("annotation_add", {
+      comment: comment,
+      element: infos[0],
+      elements: infos,
+      pageUrl: location.href
+    });
+    closeCommentDialog();
+    showToast("\\uADF8\\uB8F9 Annotation \\uCD94\\uAC00\\uB428 (\\uC694\\uC18C " + infos.length + "\\uAC1C)");
+  }
+  saveBtn.onclick = save;
+  row2.appendChild(cancelBtn);
+  row2.appendChild(saveBtn);
+  box.appendChild(row2);
+
+  ta.onkeydown = function(ev) {
+    ev.stopPropagation();
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); save(); }
+    if (ev.key === "Escape") closeCommentDialog();
+  };
+
+  clampToViewport(box, x + 8, y + 8);
+  document.documentElement.appendChild(box);
+  annDialog = box;
+  ta.focus();
+}
+
 /* ── Annotations: agent prompt builder (Copy Prompt) ──────────── */
 function buildPrompt() {
   var pageAnns = [];
@@ -1015,21 +1184,34 @@ function buildPrompt() {
   L.push("");
   for (var j = 0; j < list.length; j++) {
     var ann = list[j];
-    var e = ann.element || {};
-    var nm = e.elementName || {};
-    L.push("## " + ann.number + ". " + (ann.comment || ""));
-    if (nm.primary) L.push("- Element: " + nm.primary + " (" + (e.uiTerm || e.tag || "?") + ")");
-    if (e.cssPath || nm.selector) L.push("- Selector: \\u0060" + (e.cssPath || nm.selector) + "\\u0060");
-    if (e.sourceLocation) L.push("- Source: " + e.sourceLocation.file + ":" + e.sourceLocation.line);
+    var isGroup = ann.elements && ann.elements.length > 1;
+    L.push("## " + ann.number + ". " + (ann.comment || "") + (isGroup ? " (\\uC694\\uC18C " + ann.elements.length + "\\uAC1C)" : ""));
     L.push("- Page: " + (ann.pageUrl || location.href));
-    var txt = (e.textContent || "").trim();
-    if (txt) L.push('- Text: "' + txt.slice(0, 80) + '"');
-    if (e.boundingRect) L.push("- Size: " + Math.round(e.boundingRect.width) + "\\u00d7" + Math.round(e.boundingRect.height) + "px");
-    if (e.htmlSnippet) {
-      L.push("- HTML:");
-      L.push("\\u0060\\u0060\\u0060html");
-      L.push(e.htmlSnippet);
-      L.push("\\u0060\\u0060\\u0060");
+    if (isGroup) {
+      L.push("- Elements:");
+      for (var g = 0; g < ann.elements.length; g++) {
+        var ge = ann.elements[g];
+        var gnm = ge.elementName || {};
+        var lineParts = ["  " + (g + 1) + ") " + (gnm.primary || ge.tag) + " (" + (ge.uiTerm || "?") + ")"];
+        if (ge.cssPath || gnm.selector) lineParts.push("\\u0060" + (ge.cssPath || gnm.selector) + "\\u0060");
+        if (ge.sourceLocation) lineParts.push(ge.sourceLocation.file + ":" + ge.sourceLocation.line);
+        L.push(lineParts.join(" \\u2014 "));
+      }
+    } else {
+      var e = ann.element || {};
+      var nm = e.elementName || {};
+      if (nm.primary) L.push("- Element: " + nm.primary + " (" + (e.uiTerm || e.tag || "?") + ")");
+      if (e.cssPath || nm.selector) L.push("- Selector: \\u0060" + (e.cssPath || nm.selector) + "\\u0060");
+      if (e.sourceLocation) L.push("- Source: " + e.sourceLocation.file + ":" + e.sourceLocation.line);
+      var txt = (e.textContent || "").trim();
+      if (txt) L.push('- Text: "' + txt.slice(0, 80) + '"');
+      if (e.boundingRect) L.push("- Size: " + Math.round(e.boundingRect.width) + "\\u00d7" + Math.round(e.boundingRect.height) + "px");
+      if (e.htmlSnippet) {
+        L.push("- HTML:");
+        L.push("\\u0060\\u0060\\u0060html");
+        L.push(e.htmlSnippet);
+        L.push("\\u0060\\u0060\\u0060");
+      }
     }
     L.push("");
   }
@@ -1239,8 +1421,67 @@ function updateLabel(info) {
   }
 }
 
+document.addEventListener("mousedown", function(e) {
+  if (!annotateEnabled || e.button !== 0) return;
+  if (isOwnElement(e.target)) return;
+  dragStart = { x: e.clientX, y: e.clientY };
+  didDrag = false;
+}, true);
+
+document.addEventListener("mouseup", function(e) {
+  if (!annotateEnabled || !dragStart) return;
+  var start = dragStart;
+  dragStart = null;
+  if (marqueeEl) { marqueeEl.remove(); marqueeEl = null; }
+  if (!didDrag) return; /* plain click → click handler opens single dialog */
+  e.preventDefault();
+  e.stopPropagation();
+  var rect = {
+    left: Math.min(start.x, e.clientX),
+    top: Math.min(start.y, e.clientY),
+    right: Math.max(start.x, e.clientX),
+    bottom: Math.max(start.y, e.clientY)
+  };
+  try {
+    var selected = collectElementsInRect(rect);
+    if (selected.length === 0) {
+      showToast("\\uC601\\uC5ED\\uC5D0 \\uC644\\uC804\\uD788 \\uD3EC\\uD568\\uB41C \\uC694\\uC18C\\uAC00 \\uC5C6\\uC2B5\\uB2C8\\uB2E4");
+    } else {
+      openGroupCommentDialog(selected, e.clientX, e.clientY);
+    }
+  } catch(err) {
+    console.error("[Gemini Inspector] Marquee handler error:", err);
+  }
+  /* keep didDrag until after the click event fires, then reset */
+  setTimeout(function() { didDrag = false; }, 0);
+}, true);
+
 document.addEventListener("mousemove", function(e) {
   if (!inspectorEnabled && !annotateEnabled) return;
+
+  /* annotate drag: draw marquee instead of hover box */
+  if (annotateEnabled && dragStart) {
+    var dx = Math.abs(e.clientX - dragStart.x);
+    var dy = Math.abs(e.clientY - dragStart.y);
+    if (didDrag || dx > 5 || dy > 5) {
+      didDrag = true;
+      e.preventDefault();
+      if (!marqueeEl) {
+        marqueeEl = document.createElement("div");
+        marqueeEl.setAttribute(MARKER, "marquee");
+        marqueeEl.style.cssText = "position:fixed;border:1.5px dashed #f59e0b;background:rgba(245,158,11,0.08);pointer-events:none;z-index:100001;";
+        document.documentElement.appendChild(marqueeEl);
+      }
+      hoverBox.style.display = "none";
+      labelEl.style.display = "none";
+      marqueeEl.style.left = Math.min(dragStart.x, e.clientX) + "px";
+      marqueeEl.style.top = Math.min(dragStart.y, e.clientY) + "px";
+      marqueeEl.style.width = Math.abs(e.clientX - dragStart.x) + "px";
+      marqueeEl.style.height = Math.abs(e.clientY - dragStart.y) + "px";
+      return;
+    }
+  }
+
   var target = e.target;
   if (isOwnElement(target)) { hoverBox.style.display = "none"; return; }
   var rect = target.getBoundingClientRect();
@@ -1259,6 +1500,7 @@ document.addEventListener("click", function(e) {
   if (isOwnElement(target)) return;
   e.preventDefault();
   e.stopPropagation();
+  if (didDrag) return; /* marquee selection just finished — suppress click */
 
   if (annotateEnabled) {
     try {

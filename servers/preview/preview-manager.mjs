@@ -617,18 +617,30 @@ export class PreviewManager {
       "",
     ];
     for (const ann of annotations) {
-      const el = ann.element || {};
-      const name = el.elementName || {};
-      lines.push(`## ${ann.number}. ${ann.comment || "(코멘트 없음)"}`);
+      const isGroup = Array.isArray(ann.elements) && ann.elements.length > 1;
+      lines.push(`## ${ann.number}. ${ann.comment || "(코멘트 없음)"}${isGroup ? ` (요소 ${ann.elements.length}개)` : ""}`);
       if (ann.status === "resolved") lines.push(`- Status: resolved${ann.resolvedNote ? ` — ${ann.resolvedNote}` : ""}`);
-      if (name.primary) lines.push(`- Element: ${name.primary} (${el.uiTerm || el.tag || "?"})`);
-      if (el.cssPath || name.selector) lines.push(`- Selector: \`${el.cssPath || name.selector}\``);
-      if (el.sourceLocation) lines.push(`- Source: ${el.sourceLocation.file}:${el.sourceLocation.line}`);
       if (ann.pageUrl) lines.push(`- Page: ${ann.pageUrl}`);
-      if (el.textContent?.trim()) lines.push(`- Text: "${el.textContent.trim().slice(0, 80)}"`);
-      if (el.boundingRect) lines.push(`- Size: ${Math.round(el.boundingRect.width)}×${Math.round(el.boundingRect.height)}px`);
-      if (el.htmlSnippet) {
-        lines.push("- HTML:", "```html", el.htmlSnippet, "```");
+      if (isGroup) {
+        lines.push("- Elements:");
+        ann.elements.forEach((ge, i) => {
+          const gn = ge.elementName || {};
+          const parts = [`  ${i + 1}) ${gn.primary || ge.tag} (${ge.uiTerm || "?"})`];
+          if (ge.cssPath || gn.selector) parts.push(`\`${ge.cssPath || gn.selector}\``);
+          if (ge.sourceLocation) parts.push(`${ge.sourceLocation.file}:${ge.sourceLocation.line}`);
+          lines.push(parts.join(" — "));
+        });
+      } else {
+        const el = ann.element || {};
+        const name = el.elementName || {};
+        if (name.primary) lines.push(`- Element: ${name.primary} (${el.uiTerm || el.tag || "?"})`);
+        if (el.cssPath || name.selector) lines.push(`- Selector: \`${el.cssPath || name.selector}\``);
+        if (el.sourceLocation) lines.push(`- Source: ${el.sourceLocation.file}:${el.sourceLocation.line}`);
+        if (el.textContent?.trim()) lines.push(`- Text: "${el.textContent.trim().slice(0, 80)}"`);
+        if (el.boundingRect) lines.push(`- Size: ${Math.round(el.boundingRect.width)}×${Math.round(el.boundingRect.height)}px`);
+        if (el.htmlSnippet) {
+          lines.push("- HTML:", "```html", el.htmlSnippet, "```");
+        }
       }
       lines.push("");
     }

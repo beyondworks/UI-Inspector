@@ -110,6 +110,8 @@ export class WSBridge {
           status: "open",
           resolvedNote: null,
           element: d.element,
+          // marquee multi-select: full element list (element is the representative)
+          elements: Array.isArray(d.elements) && d.elements.length > 1 ? d.elements : null,
           pageUrl: String(d.pageUrl || ""),
           createdAt: now,
           updatedAt: now,

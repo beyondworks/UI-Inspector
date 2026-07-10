@@ -57,11 +57,12 @@ The injected toolbar (bottom-right) has three buttons: **Inspect**, **Annotate**
 
 1. Toggle **Annotate** and click any element — a comment dialog opens (⌘+Enter to save)
 2. A numbered amber pin appears. Add as many annotations as you want — **multiple pins on the same element are supported** (they stack side-by-side)
-3. Click a pin to edit the comment, resolve/reopen, or delete it
-4. Ask the agent to apply them: it calls `annotation_list`, edits the files, then calls `annotation_resolve` per item — the pin turns into a green ✓ in real time, with the agent's resolution note in the pin popup
-5. Annotations live on the server, so they survive page reloads, navigation, and HMR. Pins re-anchor via `data-at` → CSS path → selector
-6. **Pins are page-scoped**: each pin only renders on the page (pathname) where it was created — navigating elsewhere hides it, coming back restores it. SPA route changes (pushState) are detected without a reload. The toolbar count and **Copy Prompt** cover the current page; `annotation_list` / `annotation_to_prompt` still return every page (each item carries its `pageUrl`)
-7. No MCP? Press **Copy Prompt** to copy the current page's annotation set as a markdown task list for any AI coding agent
+3. **Drag to batch-select**: in Annotate mode, drag a marquee over a region — every top-level element fully inside it gets selected (if the selection collapses to a single wrapper, it descends into its children), then one comment creates a **group annotation** (one pin, up to 30 elements). The pin popup shows a "요소 N개" chip and outlines every member; the agent receives per-element selectors and source locations
+4. Click a pin to edit the comment, resolve/reopen, or delete it
+5. Ask the agent to apply them: it calls `annotation_list`, edits the files, then calls `annotation_resolve` per item — the pin turns into a green ✓ in real time, with the agent's resolution note in the pin popup
+6. Annotations live on the server, so they survive page reloads, navigation, and HMR. Pins re-anchor via `data-at` → CSS path → selector
+7. **Pins are page-scoped**: each pin only renders on the page (pathname) where it was created — navigating elsewhere hides it, coming back restores it. SPA route changes (pushState) are detected without a reload. The toolbar count and **Copy Prompt** cover the current page; `annotation_list` / `annotation_to_prompt` still return every page (each item carries its `pageUrl`)
+8. No MCP? Press **Copy Prompt** to copy the current page's annotation set as a markdown task list for any AI coding agent
 
 Each annotation carries: comment, status, element name, robust CSS path, source location (`data-at`), UI term, computed styles, text, size, and a truncated HTML snippet.
 
