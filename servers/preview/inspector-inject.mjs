@@ -306,6 +306,44 @@ function inferElementName(target, sourceLocation) {
   };
 }
 
+/* ── cssPath: robust short CSS path for re-anchoring ─────────── */
+function cssPath(el) {
+  var parts = [];
+  var node = el;
+  var depth = 0;
+  while (node && node.nodeType === 1 && node !== document.documentElement && depth < 6) {
+    var part = node.tagName.toLowerCase();
+    if (node.id && /^[A-Za-z][\\w-]*$/.test(node.id)) {
+      parts.unshift(part + "#" + node.id);
+      break;
+    }
+    var cls = "";
+    if (typeof node.className === "string") {
+      var candidates = node.className.trim().split(/\\s+/);
+      for (var i = 0; i < candidates.length; i++) {
+        if (/^[A-Za-z][\\w-]*$/.test(candidates[i])) { cls = candidates[i]; break; }
+      }
+    }
+    if (cls) part += "." + cls;
+    var parent = node.parentElement;
+    if (parent) {
+      var sibs = parent.children;
+      var sameTag = 0, idx = 0;
+      for (var j = 0; j < sibs.length; j++) {
+        if (sibs[j].tagName === node.tagName) {
+          sameTag++;
+          if (sibs[j] === node) idx = sameTag;
+        }
+      }
+      if (sameTag > 1) part += ":nth-of-type(" + idx + ")";
+    }
+    parts.unshift(part);
+    node = parent;
+    depth++;
+  }
+  return parts.join(" > ");
+}
+
 /* ── getElementInfo ───────────────────────────────────────────── */
 var STYLE_PROPS = [
   "backgroundColor","color","fontSize","fontWeight",
@@ -342,6 +380,15 @@ function getElementInfo(target) {
   var rect = target.getBoundingClientRect();
   var nameInfo = inferElementName(target, sourceLocation);
 
+  var htmlSnippet = "";
+  try {
+    htmlSnippet = target.outerHTML || "";
+    if (htmlSnippet.length > 400) htmlSnippet = htmlSnippet.slice(0, 400) + "\\u2026";
+  } catch(e) {}
+
+  var pathStr = "";
+  try { pathStr = cssPath(target); } catch(e) {}
+
   return {
     tag: target.tagName.toLowerCase(),
     className: typeof target.className === "string" ? target.className : "",
@@ -352,13 +399,17 @@ function getElementInfo(target) {
     parentChain: parentChain,
     uiTerm: info.term,
     uiDescription: info.description,
-    elementName: nameInfo
+    elementName: nameInfo,
+    cssPath: pathStr,
+    htmlSnippet: htmlSnippet
   };
 }
 
 /* ── WebSocket Client ─────────────────────────────────────────── */
 var ws = null;
 var inspectorEnabled = false;
+var annotateEnabled = false;
+var annotations = [];
 var reconnectAttempts = 0;
 var maxReconnect = 10;
 var reconnectTimer = null;
@@ -379,11 +430,18 @@ function connectWS() {
       var msg = JSON.parse(event.data);
       if (msg.type === "inspector_state") {
         inspectorEnabled = !!msg.data && !!msg.data.enabled;
+        if (inspectorEnabled) annotateEnabled = false;
         updateToolbarState();
         if (!inspectorEnabled) {
           hoverBox.style.display = "none";
           labelEl.style.display = "none";
         }
+      } else if (msg.type === "annotations_state") {
+        annotations = (msg.data && msg.data.annotations) || [];
+        closePinPopup();
+        renderPins();
+      } else if (msg.type === "highlight_element") {
+        flashHighlight(msg.data || {});
       }
     } catch(e) {}
   };
@@ -405,6 +463,39 @@ function wsSend(type, data) {
     ws.send(JSON.stringify({ type: type, data: data }));
   }
 }
+
+/* ── Runtime Error Capture ────────────────────────────────────── */
+window.addEventListener("error", function(e) {
+  wsSend("runtime_error", {
+    kind: "error",
+    message: String(e.message || ""),
+    source: (e.filename || "") + ":" + (e.lineno || 0),
+    stack: e.error && e.error.stack ? String(e.error.stack).slice(0, 1000) : ""
+  });
+});
+window.addEventListener("unhandledrejection", function(e) {
+  var r = e.reason;
+  wsSend("runtime_error", {
+    kind: "unhandledrejection",
+    message: r && r.message ? String(r.message) : String(r),
+    stack: r && r.stack ? String(r.stack).slice(0, 1000) : ""
+  });
+});
+var origConsoleError = console.error;
+console.error = function() {
+  try {
+    var parts = [];
+    for (var i = 0; i < arguments.length; i++) {
+      var a = arguments[i];
+      parts.push(typeof a === "string" ? a : (a && a.message) ? a.message : String(a));
+    }
+    var joined = parts.join(" ");
+    if (joined.indexOf("[Gemini Inspector]") === -1) {
+      wsSend("runtime_error", { kind: "console.error", message: joined.slice(0, 500) });
+    }
+  } catch(err) {}
+  return origConsoleError.apply(console, arguments);
+};
 
 /* ── DOM: Overlay Elements ────────────────────────────────────── */
 var overlay = document.createElement("div");
@@ -633,6 +724,359 @@ function renderPanel(info) {
   showPanel();
 }
 
+/* ── Annotations: pin layer ───────────────────────────────────── */
+var pinLayer = document.createElement("div");
+pinLayer.setAttribute(MARKER, "pin-layer");
+pinLayer.style.cssText = "position:fixed;inset:0;pointer-events:none;z-index:100001;";
+document.documentElement.appendChild(pinLayer);
+
+var annDialog = null;  // open comment dialog element
+var annPopup = null;   // open pin popup element
+
+/* ── Toast ────────────────────────────────────────────────────── */
+var toastEl = null;
+var toastTimer = null;
+function showToast(text) {
+  if (toastEl) { toastEl.remove(); toastEl = null; }
+  if (toastTimer) clearTimeout(toastTimer);
+  toastEl = document.createElement("div");
+  toastEl.setAttribute(MARKER, "toast");
+  toastEl.style.cssText = "position:fixed;bottom:64px;right:16px;background:#1e293b;color:#e2e8f0;padding:8px 14px;border-radius:6px;font:12px system-ui,sans-serif;z-index:100005;box-shadow:0 4px 12px rgba(0,0,0,0.4);border:1px solid #334155;pointer-events:none;";
+  toastEl.textContent = text;
+  document.documentElement.appendChild(toastEl);
+  toastTimer = setTimeout(function() {
+    if (toastEl) { toastEl.remove(); toastEl = null; }
+  }, 2200);
+}
+
+/* ── Annotations: element re-anchoring ────────────────────────── */
+function findAnnotationEl(ann) {
+  var e = ann.element || {};
+  var el = null;
+  if (e.sourceLocation && e.sourceLocation.file) {
+    try {
+      el = document.querySelector('[data-at="' + e.sourceLocation.file + ":" + e.sourceLocation.line + ":" + e.sourceLocation.column + '"]');
+    } catch(err) {}
+  }
+  if (!el && e.cssPath) { try { el = document.querySelector(e.cssPath); } catch(err) {} }
+  if (!el && e.elementName && e.elementName.selector) {
+    try { el = document.querySelector(e.elementName.selector); } catch(err) {}
+  }
+  return el;
+}
+
+/* ── Annotations: pins ────────────────────────────────────────── */
+function createPin(ann, indexInGroup) {
+  var pin = document.createElement("div");
+  pin.setAttribute(MARKER, "pin");
+  var resolved = ann.status === "resolved";
+  pin.style.cssText = "position:fixed;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;cursor:pointer;pointer-events:auto;box-shadow:0 2px 6px rgba(0,0,0,0.4);border:2px solid #fff;"
+    + (resolved ? "background:#16a34a;color:#fff;" : "background:#f59e0b;color:#1c1917;");
+  pin.textContent = resolved ? "\\u2713" : String(ann.number);
+  pin.title = ann.comment || "";
+  pin._ann = ann;
+  pin._offset = indexInGroup;
+  pin.onclick = function(ev) {
+    ev.stopPropagation();
+    ev.preventDefault();
+    openPinPopup(ann, pin);
+  };
+  return pin;
+}
+
+function renderPins() {
+  while (pinLayer.firstChild) pinLayer.removeChild(pinLayer.firstChild);
+  var groupCounts = {};
+  for (var i = 0; i < annotations.length; i++) {
+    var ann = annotations[i];
+    var el = findAnnotationEl(ann);
+    ann._el = el;
+    var key = "orphan";
+    if (el) {
+      if (!el.__gemAnnKey) el.__gemAnnKey = "k" + String(Math.random()).slice(2, 10);
+      key = el.__gemAnnKey;
+    }
+    var idx = groupCounts[key] || 0;
+    groupCounts[key] = idx + 1;
+    pinLayer.appendChild(createPin(ann, idx));
+  }
+  positionPins();
+  updateToolbarState();
+}
+
+function positionPins() {
+  var pins = pinLayer.children;
+  for (var i = 0; i < pins.length; i++) {
+    var pin = pins[i];
+    var ann = pin._ann;
+    var el = ann ? ann._el : null;
+    if (!el || !document.documentElement.contains(el)) { pin.style.display = "none"; continue; }
+    var rect = el.getBoundingClientRect();
+    if (rect.width === 0 && rect.height === 0) { pin.style.display = "none"; continue; }
+    if (rect.bottom < 0 || rect.top > window.innerHeight) { pin.style.display = "none"; continue; }
+    pin.style.display = "flex";
+    pin.style.left = Math.max(0, rect.right - 11 - pin._offset * 24) + "px";
+    pin.style.top = Math.max(0, rect.top - 11) + "px";
+  }
+}
+
+(function pinLoop() {
+  try { if (annotations.length > 0) positionPins(); } catch(e) {}
+  requestAnimationFrame(pinLoop);
+})();
+
+/* ── Annotations: comment dialog (create) ─────────────────────── */
+function closeCommentDialog() {
+  if (annDialog) { annDialog.remove(); annDialog = null; }
+}
+
+function makeSmallBtn(text, accent) {
+  var b = document.createElement("button");
+  b.setAttribute(MARKER, "btn");
+  b.textContent = text;
+  b.style.cssText = "padding:4px 10px;border-radius:5px;font:12px system-ui,sans-serif;cursor:pointer;border:1px solid "
+    + (accent ? "#f59e0b;background:#f59e0b;color:#1c1917;font-weight:700;" : "#334155;background:transparent;color:#94a3b8;");
+  return b;
+}
+
+function clampToViewport(box, x, y) {
+  box.style.left = Math.min(x, Math.max(8, window.innerWidth - 300)) + "px";
+  box.style.top = Math.min(y, Math.max(8, window.innerHeight - 180)) + "px";
+}
+
+function openCommentDialog(target, x, y) {
+  closeCommentDialog();
+  closePinPopup();
+  var info;
+  try { info = getElementInfo(target); } catch(e) { return; }
+
+  var box = document.createElement("div");
+  box.setAttribute(MARKER, "dialog");
+  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid #f59e0b;border-radius:8px;padding:10px;width:280px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+
+  var title = document.createElement("div");
+  title.style.cssText = "font-size:11px;color:#f59e0b;font-weight:700;margin-bottom:6px;word-break:break-all;";
+  title.textContent = (info.elementName && info.elementName.primary ? info.elementName.primary : info.tag) + " \\u00b7 " + info.uiTerm;
+  box.appendChild(title);
+
+  var ta = document.createElement("textarea");
+  ta.placeholder = "\\uC694\\uCCAD \\uC0AC\\uD56D\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
+  ta.style.cssText = "width:100%;height:64px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  box.appendChild(ta);
+
+  var row = document.createElement("div");
+  row.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
+  var cancelBtn = makeSmallBtn("\\uCDE8\\uC18C", false);
+  cancelBtn.onclick = function() { closeCommentDialog(); };
+  var saveBtn = makeSmallBtn("\\uCD94\\uAC00", true);
+  function save() {
+    var comment = ta.value.trim();
+    if (!comment) { ta.focus(); return; }
+    wsSend("annotation_add", { comment: comment, element: info, pageUrl: location.href });
+    closeCommentDialog();
+    showToast("Annotation \\uCD94\\uAC00\\uB428");
+  }
+  saveBtn.onclick = save;
+  row.appendChild(cancelBtn);
+  row.appendChild(saveBtn);
+  box.appendChild(row);
+
+  ta.onkeydown = function(ev) {
+    ev.stopPropagation();
+    if ((ev.metaKey || ev.ctrlKey) && ev.key === "Enter") { ev.preventDefault(); save(); }
+    if (ev.key === "Escape") closeCommentDialog();
+  };
+
+  clampToViewport(box, x + 8, y + 8);
+  document.documentElement.appendChild(box);
+  annDialog = box;
+  ta.focus();
+}
+
+/* ── Annotations: pin popup (view / edit / resolve / delete) ──── */
+function closePinPopup() {
+  if (annPopup) { annPopup.remove(); annPopup = null; }
+}
+
+function openPinPopup(ann, pin) {
+  closePinPopup();
+  closeCommentDialog();
+
+  var box = document.createElement("div");
+  box.setAttribute(MARKER, "popup");
+  var resolved = ann.status === "resolved";
+  box.style.cssText = "position:fixed;z-index:100004;background:#0f172a;border:1px solid " + (resolved ? "#16a34a" : "#f59e0b") + ";border-radius:8px;padding:10px;width:280px;box-shadow:0 8px 30px rgba(0,0,0,0.5);pointer-events:auto;font-family:system-ui,sans-serif;";
+
+  var head = document.createElement("div");
+  head.style.cssText = "display:flex;align-items:center;gap:6px;margin-bottom:6px;";
+  var numBadge = document.createElement("span");
+  numBadge.style.cssText = "font:700 11px system-ui;color:" + (resolved ? "#16a34a" : "#f59e0b") + ";";
+  numBadge.textContent = "#" + ann.number;
+  head.appendChild(numBadge);
+  var statusBadge = document.createElement("span");
+  statusBadge.style.cssText = "font-size:9px;padding:1px 6px;border-radius:3px;text-transform:uppercase;letter-spacing:0.05em;"
+    + (resolved ? "background:#052e16;color:#4ade80;" : "background:#451a03;color:#fbbf24;");
+  statusBadge.textContent = resolved ? "resolved" : "open";
+  head.appendChild(statusBadge);
+  var elName = ann.element && ann.element.elementName ? ann.element.elementName.primary : "";
+  if (elName) {
+    var nameSpan = document.createElement("span");
+    nameSpan.style.cssText = "font-size:10px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;";
+    nameSpan.textContent = elName;
+    head.appendChild(nameSpan);
+  }
+  box.appendChild(head);
+
+  var ta = document.createElement("textarea");
+  ta.value = ann.comment || "";
+  ta.style.cssText = "width:100%;height:56px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:6px 8px;font-size:12px;font-family:inherit;resize:vertical;box-sizing:border-box;outline:none;";
+  box.appendChild(ta);
+
+  if (resolved && ann.resolvedNote) {
+    var note = document.createElement("div");
+    note.style.cssText = "font-size:11px;color:#4ade80;background:#052e16;border-radius:4px;padding:5px 8px;margin-top:6px;line-height:1.4;";
+    note.textContent = "\\u2713 " + ann.resolvedNote;
+    box.appendChild(note);
+  }
+
+  var row = document.createElement("div");
+  row.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
+  var delBtn = makeSmallBtn("\\uC0AD\\uC81C", false);
+  delBtn.style.color = "#f87171";
+  delBtn.onclick = function() {
+    wsSend("annotation_remove", { id: ann.id });
+    closePinPopup();
+  };
+  var resolveBtn = makeSmallBtn(resolved ? "\\uB2E4\\uC2DC \\uC5F4\\uAE30" : "\\uD574\\uACB0", false);
+  resolveBtn.onclick = function() {
+    wsSend("annotation_update", { id: ann.id, status: resolved ? "open" : "resolved" });
+    closePinPopup();
+  };
+  var saveBtn = makeSmallBtn("\\uC800\\uC7A5", true);
+  saveBtn.onclick = function() {
+    var c = ta.value.trim();
+    if (c && c !== ann.comment) wsSend("annotation_update", { id: ann.id, comment: c });
+    closePinPopup();
+  };
+  row.appendChild(delBtn);
+  row.appendChild(resolveBtn);
+  row.appendChild(saveBtn);
+  box.appendChild(row);
+
+  ta.onkeydown = function(ev) {
+    ev.stopPropagation();
+    if (ev.key === "Escape") closePinPopup();
+  };
+
+  var pr = pin.getBoundingClientRect();
+  clampToViewport(box, pr.left + 26, pr.top);
+  document.documentElement.appendChild(box);
+  annPopup = box;
+}
+
+/* ── Annotations: agent prompt builder (Copy Prompt) ──────────── */
+function buildPrompt() {
+  var open = [];
+  for (var i = 0; i < annotations.length; i++) {
+    if (annotations[i].status === "open") open.push(annotations[i]);
+  }
+  var list = open.length ? open : annotations;
+  var L = [];
+  L.push("# UI Annotations (" + list.length + ")");
+  L.push("");
+  L.push("\\uB2E4\\uC74C\\uC740 \\uB77C\\uC774\\uBE0C \\uD504\\uB9AC\\uBDF0\\uC5D0\\uC11C \\uC0AC\\uC6A9\\uC790\\uAC00 \\uC694\\uC18C\\uC5D0 \\uB0A8\\uAE34 \\uC218\\uC815 \\uC694\\uCCAD\\uC785\\uB2C8\\uB2E4.");
+  L.push("\\uAC01 \\uD56D\\uBAA9\\uC758 \\uC694\\uC18C\\uB97C \\uCC3E\\uC544 \\uC694\\uCCAD\\uC744 \\uBC18\\uC601\\uD558\\uC138\\uC694.");
+  L.push("");
+  for (var j = 0; j < list.length; j++) {
+    var ann = list[j];
+    var e = ann.element || {};
+    var nm = e.elementName || {};
+    L.push("## " + ann.number + ". " + (ann.comment || ""));
+    if (nm.primary) L.push("- Element: " + nm.primary + " (" + (e.uiTerm || e.tag || "?") + ")");
+    if (e.cssPath || nm.selector) L.push("- Selector: \\u0060" + (e.cssPath || nm.selector) + "\\u0060");
+    if (e.sourceLocation) L.push("- Source: " + e.sourceLocation.file + ":" + e.sourceLocation.line);
+    L.push("- Page: " + (ann.pageUrl || location.href));
+    var txt = (e.textContent || "").trim();
+    if (txt) L.push('- Text: "' + txt.slice(0, 80) + '"');
+    if (e.boundingRect) L.push("- Size: " + Math.round(e.boundingRect.width) + "\\u00d7" + Math.round(e.boundingRect.height) + "px");
+    if (e.htmlSnippet) {
+      L.push("- HTML:");
+      L.push("\\u0060\\u0060\\u0060html");
+      L.push(e.htmlSnippet);
+      L.push("\\u0060\\u0060\\u0060");
+    }
+    L.push("");
+  }
+  return L.join("\\n");
+}
+
+function copyPrompt() {
+  if (annotations.length === 0) { showToast("Annotation\\uC774 \\uC5C6\\uC2B5\\uB2C8\\uB2E4"); return; }
+  var text = buildPrompt();
+  function fallbackCopy() {
+    var ta = document.createElement("textarea");
+    ta.setAttribute(MARKER, "copy");
+    ta.value = text;
+    ta.style.cssText = "position:fixed;left:-9999px;top:0;";
+    document.documentElement.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); showToast("\\uD504\\uB86C\\uD504\\uD2B8 \\uBCF5\\uC0AC\\uB428"); } catch(e) { showToast("\\uBCF5\\uC0AC \\uC2E4\\uD328"); }
+    ta.remove();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(function() {
+      showToast("\\uD504\\uB86C\\uD504\\uD2B8 \\uBCF5\\uC0AC\\uB428 (" + annotations.length + "\\uAC1C)");
+    }, fallbackCopy);
+  } else {
+    fallbackCopy();
+  }
+}
+
+/* ── Agent highlight (agent → user visual pointing) ───────────── */
+function flashHighlight(data) {
+  var el = null;
+  if (data.selector) { try { el = document.querySelector(data.selector); } catch(e) {} }
+  if (!el && data.dataAt) {
+    try { el = document.querySelector('[data-at^="' + data.dataAt + '"]'); } catch(e) {}
+  }
+  if (!el) return;
+  try { el.scrollIntoView({ behavior: "smooth", block: "center" }); } catch(e) {}
+
+  var hl = document.createElement("div");
+  hl.setAttribute(MARKER, "highlight");
+  hl.style.cssText = "position:fixed;border:3px solid #f59e0b;border-radius:4px;background:rgba(245,158,11,0.15);pointer-events:none;z-index:100000;transition:opacity 0.3s;";
+  document.documentElement.appendChild(hl);
+  var lbl = null;
+  if (data.label) {
+    lbl = document.createElement("div");
+    lbl.setAttribute(MARKER, "highlight-label");
+    lbl.style.cssText = "position:fixed;background:#f59e0b;color:#1c1917;padding:3px 8px;border-radius:4px;font:700 11px system-ui,sans-serif;pointer-events:none;z-index:100000;white-space:nowrap;";
+    lbl.textContent = data.label;
+    document.documentElement.appendChild(lbl);
+  }
+  var t0 = Date.now();
+  var iv = setInterval(function() {
+    if (!document.documentElement.contains(el)) {
+      clearInterval(iv); hl.remove(); if (lbl) lbl.remove(); return;
+    }
+    var r = el.getBoundingClientRect();
+    hl.style.left = (r.x - 4) + "px";
+    hl.style.top = (r.y - 4) + "px";
+    hl.style.width = (r.width + 8) + "px";
+    hl.style.height = (r.height + 8) + "px";
+    if (lbl) {
+      lbl.style.left = r.x + "px";
+      lbl.style.top = Math.max(0, r.y - 28) + "px";
+    }
+    if (Date.now() - t0 > 2500) {
+      clearInterval(iv);
+      hl.style.opacity = "0";
+      if (lbl) lbl.style.opacity = "0";
+      setTimeout(function() { hl.remove(); if (lbl) lbl.remove(); }, 350);
+    }
+  }, 50);
+}
+
 /* ── Mini Toolbar ─────────────────────────────────────────────── */
 var toolbar = document.createElement("div");
 toolbar.setAttribute(MARKER, "toolbar");
@@ -640,10 +1084,14 @@ toolbar.style.cssText = "position:fixed;bottom:16px;right:16px;z-index:100003;di
 
 var toggleBtn = document.createElement("button");
 toggleBtn.setAttribute(MARKER, "btn");
-toggleBtn.textContent = "Inspector OFF";
+toggleBtn.textContent = "Inspect OFF";
 toggleBtn.style.cssText = "padding:6px 14px;border-radius:6px;border:1px solid #334155;background:#0f172a;color:#94a3b8;cursor:pointer;font-size:13px;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,0.3);";
 toggleBtn.onclick = function() {
   inspectorEnabled = !inspectorEnabled;
+  if (inspectorEnabled) {
+    annotateEnabled = false;
+    closeCommentDialog();
+  }
   wsSend("inspector_state", { enabled: inspectorEnabled });
   updateToolbarState();
   if (!inspectorEnabled) {
@@ -653,10 +1101,37 @@ toggleBtn.onclick = function() {
   }
 };
 toolbar.appendChild(toggleBtn);
+
+var annotateBtn = document.createElement("button");
+annotateBtn.setAttribute(MARKER, "btn");
+annotateBtn.textContent = "Annotate OFF";
+annotateBtn.style.cssText = toggleBtn.style.cssText;
+annotateBtn.onclick = function() {
+  annotateEnabled = !annotateEnabled;
+  if (annotateEnabled && inspectorEnabled) {
+    inspectorEnabled = false;
+    wsSend("inspector_state", { enabled: false });
+    hidePanel();
+  }
+  updateToolbarState();
+  if (!annotateEnabled) {
+    hoverBox.style.display = "none";
+    labelEl.style.display = "none";
+    closeCommentDialog();
+  }
+};
+toolbar.appendChild(annotateBtn);
+
+var promptBtn = document.createElement("button");
+promptBtn.setAttribute(MARKER, "btn");
+promptBtn.textContent = "Copy Prompt";
+promptBtn.style.cssText = toggleBtn.style.cssText;
+promptBtn.onclick = copyPrompt;
+toolbar.appendChild(promptBtn);
 document.documentElement.appendChild(toolbar);
 
 /* ── DOM Guard: re-attach if framework removes our elements ── */
-var guardEls = [overlay, panel, toolbar];
+var guardEls = [overlay, panel, toolbar, pinLayer];
 var observer = new MutationObserver(function(mutations) {
   for (var i = 0; i < guardEls.length; i++) {
     ensureAttached(guardEls[i]);
@@ -666,15 +1141,41 @@ observer.observe(document.documentElement, { childList: true });
 
 function updateToolbarState() {
   if (inspectorEnabled) {
-    toggleBtn.textContent = "Inspector ON";
+    toggleBtn.textContent = "Inspect ON";
     toggleBtn.style.borderColor = "#3b82f6";
     toggleBtn.style.backgroundColor = "#1e3a5f";
     toggleBtn.style.color = "#60a5fa";
   } else {
-    toggleBtn.textContent = "Inspector OFF";
+    toggleBtn.textContent = "Inspect OFF";
     toggleBtn.style.borderColor = "#334155";
     toggleBtn.style.backgroundColor = "#0f172a";
     toggleBtn.style.color = "#94a3b8";
+  }
+  if (annotateEnabled) {
+    annotateBtn.textContent = "Annotate ON";
+    annotateBtn.style.borderColor = "#f59e0b";
+    annotateBtn.style.backgroundColor = "#451a03";
+    annotateBtn.style.color = "#fbbf24";
+  } else {
+    annotateBtn.textContent = "Annotate OFF";
+    annotateBtn.style.borderColor = "#334155";
+    annotateBtn.style.backgroundColor = "#0f172a";
+    annotateBtn.style.color = "#94a3b8";
+  }
+  var openCount = 0;
+  for (var i = 0; i < annotations.length; i++) {
+    if (annotations[i].status === "open") openCount++;
+  }
+  if (annotations.length > 0) {
+    promptBtn.textContent = "Copy Prompt (" + openCount + "/" + annotations.length + ")";
+    promptBtn.style.borderColor = "#f59e0b";
+    promptBtn.style.color = "#fbbf24";
+    promptBtn.style.backgroundColor = "#0f172a";
+  } else {
+    promptBtn.textContent = "Copy Prompt";
+    promptBtn.style.borderColor = "#334155";
+    promptBtn.style.color = "#94a3b8";
+    promptBtn.style.backgroundColor = "#0f172a";
   }
 }
 
@@ -706,11 +1207,13 @@ function updateLabel(info) {
 }
 
 document.addEventListener("mousemove", function(e) {
-  if (!inspectorEnabled) return;
+  if (!inspectorEnabled && !annotateEnabled) return;
   var target = e.target;
   if (isOwnElement(target)) { hoverBox.style.display = "none"; return; }
   var rect = target.getBoundingClientRect();
   hoverBox.style.display = "block";
+  hoverBox.style.borderColor = annotateEnabled ? "#f59e0b" : "#3b82f6";
+  hoverBox.style.background = annotateEnabled ? "rgba(245,158,11,0.08)" : "rgba(59,130,246,0.1)";
   hoverBox.style.left = rect.x + "px";
   hoverBox.style.top = rect.y + "px";
   hoverBox.style.width = rect.width + "px";
@@ -718,11 +1221,20 @@ document.addEventListener("mousemove", function(e) {
 }, true);
 
 document.addEventListener("click", function(e) {
-  if (!inspectorEnabled) return;
+  if (!inspectorEnabled && !annotateEnabled) return;
   var target = e.target;
   if (isOwnElement(target)) return;
   e.preventDefault();
   e.stopPropagation();
+
+  if (annotateEnabled) {
+    try {
+      openCommentDialog(target, e.clientX, e.clientY);
+    } catch(err) {
+      console.error("[Gemini Inspector] Annotate handler error:", err);
+    }
+    return;
+  }
 
   try {
     var info = getElementInfo(target);

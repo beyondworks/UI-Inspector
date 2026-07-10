@@ -23,9 +23,9 @@ Register the MCP server in `~/.claude.json` (replace `</path/to>` with your abso
 
 Restart Claude Code.
 
-## Tools (12)
+## Tools (18)
 
-### Preview (7)
+### Preview (8)
 - `preview_start` — new Vite session (react / vue / vanilla template)
 - `preview_attach` — attach to an existing Next.js/Vite/etc. dev server via inject proxy
 - `preview_update` — write/delete files and trigger Vite HMR
@@ -33,15 +33,38 @@ Restart Claude Code.
 - `preview_stop`
 - `preview_export` — convert to target framework + zip
 - `preview_screenshot` — capture viewport or single selector (mobile / tablet / desktop / full)
+- `preview_errors` — runtime errors captured from the page (uncaught errors, unhandled rejections, `console.error`)
 
-### Inspector (3)
+### Inspector (4)
 - `preview_select_element` — enable/disable inspector mode or fetch selection (session-scoped)
 - `inspector_get_selection` — most recent click across all sessions; called when the user says "this", "here", "the selected one"
 - `inspector_clear_selection`
+- `inspector_highlight` — agent → browser visual pointing: flash-highlight an element by CSS selector or `data-at` value, with optional label ("여기 수정했어요")
+
+### Annotations (4) — Agentation-style multi-annotation
+- `annotation_list` — all annotations (pins + comments) left by the user in the browser, with full element context
+- `annotation_resolve` — mark annotations resolved (pins turn green live in the browser) with an optional note; `reopen: true` to undo
+- `annotation_remove` — delete annotations (ids or all)
+- `annotation_to_prompt` — convert annotations into an agent-ready markdown task list (same format as the in-browser **Copy Prompt** button — paste into Claude Code, Codex, or any coding agent)
 
 ### Knowledge (2)
 - `query_ontology` — local design knowledge store
 - `validate_design` — contrast / tap target / hierarchy / spacing rules
+
+## Annotations — Agentation-style workflow
+
+The injected toolbar (bottom-right) has three buttons: **Inspect**, **Annotate**, **Copy Prompt (open/total)**.
+
+1. Toggle **Annotate** and click any element — a comment dialog opens (⌘+Enter to save)
+2. A numbered amber pin appears. Add as many annotations as you want — **multiple pins on the same element are supported** (they stack side-by-side)
+3. Click a pin to edit the comment, resolve/reopen, or delete it
+4. Ask the agent to apply them: it calls `annotation_list`, edits the files, then calls `annotation_resolve` per item — the pin turns into a green ✓ in real time, with the agent's resolution note in the pin popup
+5. Annotations live on the server, so they survive page reloads and HMR. Pins re-anchor via `data-at` → CSS path → selector
+6. No MCP? Press **Copy Prompt** to copy the whole annotation set as a markdown task list for any AI coding agent
+
+Each annotation carries: comment, status, element name, robust CSS path, source location (`data-at`), UI term, computed styles, text, size, and a truncated HTML snippet.
+
+> The annotation UI ships with the inject proxy (`preview_attach`). For `preview_start` sessions, attach to the Vite URL if you need annotations.
 
 ## What Claude sees on each click
 

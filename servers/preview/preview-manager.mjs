@@ -517,6 +517,158 @@ export class PreviewManager {
     return { cleared };
   }
 
+  /* ── Annotations ─────────────────────────────────────────────── */
+
+  /**
+   * Collect wsBridge-backed sessions, optionally narrowed to one id.
+   *
+   * @param {string} [sessionId]
+   * @returns {Array<[string, PreviewSession]>}
+   */
+  _bridgeSessions(sessionId) {
+    if (sessionId) {
+      const session = this._requireSession(sessionId);
+      return session.wsBridge ? [[sessionId, session]] : [];
+    }
+    return Array.from(this.sessions.entries()).filter(([, s]) => s.wsBridge);
+  }
+
+  /**
+   * List annotations across all sessions (or one session).
+   *
+   * @param {string} [sessionId]
+   * @param {"open" | "resolved" | "all"} [status="all"]
+   * @returns {{ total: number, open: number, resolved: number, annotations: Array<Object> }}
+   */
+  listAnnotations(sessionId, status = "all") {
+    const annotations = [];
+    for (const [sid, session] of this._bridgeSessions(sessionId)) {
+      for (const ann of session.wsBridge.getAnnotations(status)) {
+        annotations.push({ session_id: sid, ...ann });
+      }
+    }
+    const open = annotations.filter((a) => a.status === "open").length;
+    return {
+      total: annotations.length,
+      open,
+      resolved: annotations.length - open,
+      annotations,
+    };
+  }
+
+  /**
+   * Resolve (or reopen) annotations. `ids: "all"` targets every annotation.
+   *
+   * @param {string[] | "all"} ids
+   * @param {{ session_id?: string, note?: string, reopen?: boolean }} [opts]
+   * @returns {{ updated: string[], notFound: string[] }}
+   */
+  resolveAnnotations(ids, { session_id, note, reopen } = {}) {
+    const updated = [];
+    let notFound = Array.isArray(ids) ? [...ids] : [];
+    for (const [, session] of this._bridgeSessions(session_id)) {
+      const remaining = ids === "all" ? "all" : notFound;
+      const res = session.wsBridge.resolveAnnotations(remaining, { note, reopen });
+      updated.push(...res.updated);
+      if (ids !== "all") notFound = res.notFound;
+    }
+    return { updated, notFound: ids === "all" ? [] : notFound };
+  }
+
+  /**
+   * Remove annotations. `ids: "all"` clears everything.
+   *
+   * @param {string[] | "all"} ids
+   * @param {string} [sessionId]
+   * @returns {{ removed: string[] }}
+   */
+  removeAnnotations(ids, sessionId) {
+    const removed = [];
+    let remaining = Array.isArray(ids) ? [...ids] : ids;
+    for (const [, session] of this._bridgeSessions(sessionId)) {
+      const res = session.wsBridge.removeAnnotations(remaining);
+      removed.push(...res.removed);
+      if (Array.isArray(remaining)) {
+        remaining = remaining.filter((id) => !res.removed.includes(id));
+      }
+    }
+    return { removed };
+  }
+
+  /**
+   * Build an agent-ready markdown prompt from annotations (Agentation-style).
+   * The same format is produced by the in-browser "Copy Prompt" button, so
+   * output can be pasted into any coding agent (Claude Code, Codex, ...).
+   *
+   * @param {string} [sessionId]
+   * @param {"open" | "resolved" | "all"} [status="open"]
+   * @returns {{ count: number, prompt: string }}
+   */
+  annotationsToPrompt(sessionId, status = "open") {
+    const { annotations } = this.listAnnotations(sessionId, status);
+    if (annotations.length === 0) {
+      return { count: 0, prompt: "" };
+    }
+    const lines = [
+      `# UI Annotations (${annotations.length})`,
+      "",
+      "다음은 라이브 프리뷰에서 사용자가 요소에 남긴 수정 요청입니다.",
+      "각 항목의 요소를 찾아 요청을 반영하세요.",
+      "",
+    ];
+    for (const ann of annotations) {
+      const el = ann.element || {};
+      const name = el.elementName || {};
+      lines.push(`## ${ann.number}. ${ann.comment || "(코멘트 없음)"}`);
+      if (ann.status === "resolved") lines.push(`- Status: resolved${ann.resolvedNote ? ` — ${ann.resolvedNote}` : ""}`);
+      if (name.primary) lines.push(`- Element: ${name.primary} (${el.uiTerm || el.tag || "?"})`);
+      if (el.cssPath || name.selector) lines.push(`- Selector: \`${el.cssPath || name.selector}\``);
+      if (el.sourceLocation) lines.push(`- Source: ${el.sourceLocation.file}:${el.sourceLocation.line}`);
+      if (ann.pageUrl) lines.push(`- Page: ${ann.pageUrl}`);
+      if (el.textContent?.trim()) lines.push(`- Text: "${el.textContent.trim().slice(0, 80)}"`);
+      if (el.boundingRect) lines.push(`- Size: ${Math.round(el.boundingRect.width)}×${Math.round(el.boundingRect.height)}px`);
+      if (el.htmlSnippet) {
+        lines.push("- HTML:", "```html", el.htmlSnippet, "```");
+      }
+      lines.push("");
+    }
+    return { count: annotations.length, prompt: lines.join("\n") };
+  }
+
+  /**
+   * Flash-highlight an element in connected browsers (agent → user pointing).
+   *
+   * @param {{ selector?: string, dataAt?: string, label?: string }} target
+   * @param {string} [sessionId]
+   * @returns {{ sessions: string[] }}
+   */
+  highlightElement(target, sessionId) {
+    const sessions = [];
+    for (const [sid, session] of this._bridgeSessions(sessionId)) {
+      session.wsBridge.highlightElement(target);
+      sessions.push(sid);
+    }
+    return { sessions };
+  }
+
+  /**
+   * Return recent runtime/console errors captured from the page.
+   *
+   * @param {string} [sessionId]
+   * @param {number} [limit=20]
+   * @returns {{ errors: Array<Object> }}
+   */
+  getRuntimeErrors(sessionId, limit = 20) {
+    const errors = [];
+    for (const [sid, session] of this._bridgeSessions(sessionId)) {
+      for (const err of session.wsBridge.getRuntimeErrors(limit)) {
+        errors.push({ session_id: sid, ...err });
+      }
+    }
+    errors.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+    return { errors: errors.slice(-limit) };
+  }
+
   /**
    * Export the project directory as a ZIP archive.
    *

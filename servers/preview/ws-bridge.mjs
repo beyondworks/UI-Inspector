@@ -1,4 +1,18 @@
 import { WebSocketServer } from "ws";
+import crypto from "node:crypto";
+
+/**
+ * @typedef {Object} Annotation
+ * @property {string} id
+ * @property {number} number        - display number (1-based, stable)
+ * @property {string} comment
+ * @property {"open" | "resolved"} status
+ * @property {string | null} resolvedNote
+ * @property {Object} element       - full element info captured at creation
+ * @property {string} pageUrl
+ * @property {string} createdAt
+ * @property {string} updatedAt
+ */
 
 export class WSBridge {
   constructor(port = 5175) {
@@ -14,6 +28,9 @@ export class WSBridge {
     this.runtimeErrors = [];
     /** @type {((data: any) => Promise<any>) | null} */
     this.onExportRequest = null;
+    /** @type {Map<string, Annotation>} */
+    this.annotations = new Map();
+    this.nextAnnotationNumber = 1;
   }
 
   async start() {
@@ -26,10 +43,13 @@ export class WSBridge {
       this.wss.on("connection", (ws) => {
         this.clients.add(ws);
 
-        // Send current inspector state to newly connected client
+        // Send current inspector state + annotations to newly connected client
         try {
           ws.send(
             JSON.stringify({ type: "inspector_state", data: { enabled: this.inspectorEnabled } })
+          );
+          ws.send(
+            JSON.stringify({ type: "annotations_state", data: { annotations: this.getAnnotations() } })
           );
         } catch (_) {}
 
@@ -78,6 +98,47 @@ export class WSBridge {
       case "element_hover":
         // Reserved for future use
         break;
+      case "annotation_add": {
+        const d = msg.data || {};
+        if (!d.element) break;
+        const id = d.id || "ann_" + crypto.randomBytes(5).toString("hex");
+        const now = new Date().toISOString();
+        this.annotations.set(id, {
+          id,
+          number: this.nextAnnotationNumber++,
+          comment: String(d.comment || ""),
+          status: "open",
+          resolvedNote: null,
+          element: d.element,
+          pageUrl: String(d.pageUrl || ""),
+          createdAt: now,
+          updatedAt: now,
+        });
+        this._broadcastAnnotations();
+        break;
+      }
+      case "annotation_update": {
+        const d = msg.data || {};
+        const ann = this.annotations.get(d.id);
+        if (!ann) break;
+        if (typeof d.comment === "string") ann.comment = d.comment;
+        if (d.status === "open" || d.status === "resolved") ann.status = d.status;
+        ann.updatedAt = new Date().toISOString();
+        this._broadcastAnnotations();
+        break;
+      }
+      case "annotation_remove": {
+        const d = msg.data || {};
+        if (this.annotations.delete(d.id)) this._broadcastAnnotations();
+        break;
+      }
+      case "annotations_clear":
+        this.annotations.clear();
+        this._broadcastAnnotations();
+        break;
+      case "request_annotations":
+        this._broadcastAnnotations();
+        break;
       default:
         // Unknown message types are silently ignored
         break;
@@ -121,6 +182,88 @@ export class WSBridge {
    */
   notifyUpdate(files) {
     this.broadcast({ type: "files_updated", files: Object.keys(files) });
+  }
+
+  /* ── Annotations (server-side API for MCP tools) ───────────── */
+
+  /**
+   * Return all annotations sorted by display number.
+   *
+   * @param {"open" | "resolved" | "all"} [status="all"]
+   * @returns {Annotation[]}
+   */
+  getAnnotations(status = "all") {
+    const list = Array.from(this.annotations.values());
+    const filtered = status === "all" ? list : list.filter((a) => a.status === status);
+    return filtered.sort((a, b) => a.number - b.number);
+  }
+
+  /**
+   * Mark annotations as resolved (or reopen). Pins update live in the browser.
+   *
+   * @param {string[] | "all"} ids
+   * @param {Object} [opts]
+   * @param {string} [opts.note]        - resolution note shown in the pin popup
+   * @param {boolean} [opts.reopen]     - set status back to "open"
+   * @returns {{ updated: string[], notFound: string[] }}
+   */
+  resolveAnnotations(ids, { note, reopen = false } = {}) {
+    const targetIds = ids === "all"
+      ? Array.from(this.annotations.keys())
+      : Array.isArray(ids) ? ids : [];
+    const updated = [];
+    const notFound = [];
+    for (const id of targetIds) {
+      const ann = this.annotations.get(id);
+      if (!ann) { notFound.push(id); continue; }
+      ann.status = reopen ? "open" : "resolved";
+      ann.resolvedNote = reopen ? null : (note ?? ann.resolvedNote);
+      ann.updatedAt = new Date().toISOString();
+      updated.push(id);
+    }
+    if (updated.length) this._broadcastAnnotations();
+    return { updated, notFound };
+  }
+
+  /**
+   * Remove annotations by id, or all of them.
+   *
+   * @param {string[] | "all"} ids
+   * @returns {{ removed: string[] }}
+   */
+  removeAnnotations(ids) {
+    const targetIds = ids === "all"
+      ? Array.from(this.annotations.keys())
+      : Array.isArray(ids) ? ids : [];
+    const removed = [];
+    for (const id of targetIds) {
+      if (this.annotations.delete(id)) removed.push(id);
+    }
+    if (removed.length) this._broadcastAnnotations();
+    return { removed };
+  }
+
+  /**
+   * Flash-highlight an element in the browser (agent → user visual pointing).
+   *
+   * @param {{ selector?: string, dataAt?: string, label?: string }} target
+   */
+  highlightElement(target = {}) {
+    this.broadcast({ type: "highlight_element", data: target });
+  }
+
+  /**
+   * Return recent runtime errors captured from the page.
+   *
+   * @param {number} [limit=20]
+   * @returns {Array<Object>}
+   */
+  getRuntimeErrors(limit = 20) {
+    return this.runtimeErrors.slice(-limit);
+  }
+
+  _broadcastAnnotations() {
+    this.broadcast({ type: "annotations_state", data: { annotations: this.getAnnotations() } });
   }
 
   /**
