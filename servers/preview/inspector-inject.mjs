@@ -947,7 +947,7 @@ function openCommentDialog(target, x, y) {
   box.appendChild(title);
 
   var ta = document.createElement("textarea");
-  ta.placeholder = "\\uC694\\uCCAD \\uC0AC\\uD56D\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
+  ta.placeholder = "Describe the change\\u2026 (\\u2318+Enter to save)";
   ta.style.cssText = "width:100%;height:64px;background:#fff;color:" + C_TXT + ";border:1px solid #dcdcd4;border-radius:10px;padding:8px 10px;font:12px " + F_MONO + ";resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.18s ease;";
   ta.onfocus = function() { ta.style.borderColor = C_TXT; };
   ta.onblur = function() { ta.style.borderColor = "#dcdcd4"; };
@@ -955,15 +955,15 @@ function openCommentDialog(target, x, y) {
 
   var row = document.createElement("div");
   row.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
-  var cancelBtn = makeSmallBtn("\\uCDE8\\uC18C", false);
+  var cancelBtn = makeSmallBtn("Cancel", false);
   cancelBtn.onclick = function() { closeCommentDialog(); };
-  var saveBtn = makeSmallBtn("\\uCD94\\uAC00", true);
+  var saveBtn = makeSmallBtn("Add", true);
   function save() {
     var comment = ta.value.trim();
     if (!comment) { ta.focus(); return; }
     wsSend("annotation_add", { comment: comment, element: info, pageUrl: location.href });
     closeCommentDialog();
-    showToast("Annotation \\uCD94\\uAC00\\uB428");
+    showToast("Annotation added");
   }
   saveBtn.onclick = save;
   row.appendChild(cancelBtn);
@@ -1010,7 +1010,7 @@ function openPinPopup(ann, pin) {
   if (ann.elements && ann.elements.length > 1) {
     var groupChip = document.createElement("span");
     groupChip.style.cssText = "font:700 8px " + F_MONO + ";padding:3px 9px;border-radius:999px;background:" + C_WELL + ";color:#3d3d38;letter-spacing:0.04em;";
-    groupChip.textContent = "\\uC694\\uC18C " + ann.elements.length + "\\uAC1C";
+    groupChip.textContent = ann.elements.length + " elements";
     head.appendChild(groupChip);
     /* show which elements belong to this group */
     var groupEls = [];
@@ -1045,18 +1045,18 @@ function openPinPopup(ann, pin) {
 
   var row = document.createElement("div");
   row.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
-  var delBtn = makeSmallBtn("\\uC0AD\\uC81C", false);
+  var delBtn = makeSmallBtn("Delete", false);
   delBtn.style.color = C_RED;
   delBtn.onclick = function() {
     wsSend("annotation_remove", { id: ann.id });
     closePinPopup();
   };
-  var resolveBtn = makeSmallBtn(resolved ? "\\uB2E4\\uC2DC \\uC5F4\\uAE30" : "\\uD574\\uACB0", false);
+  var resolveBtn = makeSmallBtn(resolved ? "Reopen" : "Resolve", false);
   resolveBtn.onclick = function() {
     wsSend("annotation_update", { id: ann.id, status: resolved ? "open" : "resolved" });
     closePinPopup();
   };
-  var saveBtn = makeSmallBtn("\\uC800\\uC7A5", true);
+  var saveBtn = makeSmallBtn("Save", true);
   saveBtn.onclick = function() {
     var c = ta.value.trim();
     if (c && c !== ann.comment) wsSend("annotation_update", { id: ann.id, comment: c });
@@ -1175,7 +1175,7 @@ function openGroupCommentDialog(targets, x, y) {
   var gSq = document.createElement("span");
   gSq.style.cssText = "width:6px;height:6px;background:" + C_RED + ";display:inline-block;flex:none;";
   title.appendChild(gSq);
-  title.appendChild(document.createTextNode("\\uC694\\uC18C " + infos.length + "\\uAC1C \\uC120\\uD0DD\\uB428" + (truncated ? " (\\uCD5C\\uB300 " + MAX_GROUP + "\\uAC1C\\uAE4C\\uC9C0)" : "")));
+  title.appendChild(document.createTextNode(infos.length + " elements selected" + (truncated ? " (max " + MAX_GROUP + ")" : "")));
   box.appendChild(title);
 
   var listEl = document.createElement("div");
@@ -1189,13 +1189,13 @@ function openGroupCommentDialog(targets, x, y) {
   }
   if (infos.length > previewCount) {
     var more = document.createElement("div");
-    more.textContent = "\\u2026 \\uC678 " + (infos.length - previewCount) + "\\uAC1C";
+    more.textContent = "\\u2026 +" + (infos.length - previewCount) + " more";
     listEl.appendChild(more);
   }
   box.appendChild(listEl);
 
   var ta = document.createElement("textarea");
-  ta.placeholder = "\\uC120\\uD0DD\\uB41C \\uC694\\uC18C\\uB4E4\\uC5D0 \\uB300\\uD55C \\uC694\\uCCAD\\uC744 \\uC785\\uB825\\uD558\\uC138\\uC694\\u2026 (\\u2318+Enter \\uC800\\uC7A5)";
+  ta.placeholder = "Describe the change for the selected elements\\u2026 (\\u2318+Enter to save)";
   ta.style.cssText = "width:100%;height:56px;background:#fff;color:" + C_TXT + ";border:1px solid #dcdcd4;border-radius:10px;padding:8px 10px;font:12px " + F_MONO + ";resize:vertical;box-sizing:border-box;outline:none;transition:border-color 0.18s ease;";
   ta.onfocus = function() { ta.style.borderColor = C_TXT; };
   ta.onblur = function() { ta.style.borderColor = "#dcdcd4"; };
@@ -1203,9 +1203,9 @@ function openGroupCommentDialog(targets, x, y) {
 
   var row2 = document.createElement("div");
   row2.style.cssText = "display:flex;justify-content:flex-end;gap:6px;margin-top:8px;";
-  var cancelBtn = makeSmallBtn("\\uCDE8\\uC18C", false);
+  var cancelBtn = makeSmallBtn("Cancel", false);
   cancelBtn.onclick = function() { closeCommentDialog(); };
-  var saveBtn = makeSmallBtn("\\uCD94\\uAC00", true);
+  var saveBtn = makeSmallBtn("Add", true);
   function save() {
     var comment = ta.value.trim();
     if (!comment) { ta.focus(); return; }
@@ -1216,7 +1216,7 @@ function openGroupCommentDialog(targets, x, y) {
       pageUrl: location.href
     });
     closeCommentDialog();
-    showToast("\\uADF8\\uB8F9 Annotation \\uCD94\\uAC00\\uB428 (\\uC694\\uC18C " + infos.length + "\\uAC1C)");
+    showToast("Group annotation added (" + infos.length + " elements)");
   }
   saveBtn.onclick = save;
   row2.appendChild(cancelBtn);
@@ -1293,7 +1293,7 @@ function copyPrompt() {
   for (var i = 0; i < annotations.length; i++) {
     if (samePage(annotations[i])) pageCount++;
   }
-  if (pageCount === 0) { showToast("\\uC774 \\uD398\\uC774\\uC9C0\\uC5D0 Annotation\\uC774 \\uC5C6\\uC2B5\\uB2C8\\uB2E4"); return; }
+  if (pageCount === 0) { showToast("No annotations on this page"); return; }
   var text = buildPrompt();
   function fallbackCopy() {
     var ta = document.createElement("textarea");
@@ -1302,12 +1302,12 @@ function copyPrompt() {
     ta.style.cssText = "position:fixed;left:-9999px;top:0;";
     document.documentElement.appendChild(ta);
     ta.select();
-    try { document.execCommand("copy"); showToast("\\uD504\\uB86C\\uD504\\uD2B8 \\uBCF5\\uC0AC\\uB428"); } catch(e) { showToast("\\uBCF5\\uC0AC \\uC2E4\\uD328"); }
+    try { document.execCommand("copy"); showToast("Prompt copied"); } catch(e) { showToast("Copy failed"); }
     ta.remove();
   }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(text).then(function() {
-      showToast("\\uD504\\uB86C\\uD504\\uD2B8 \\uBCF5\\uC0AC\\uB428 (" + annotations.length + "\\uAC1C)");
+      showToast("Prompt copied (" + pageCount + ")");
     }, fallbackCopy);
   } else {
     fallbackCopy();
@@ -1368,7 +1368,7 @@ toolbar.style.cssText = "position:fixed;bottom:18px;right:18px;z-index:100003;di
 var brandBtn = document.createElement("button");
 brandBtn.setAttribute(MARKER, "btn");
 brandBtn.textContent = "\\u25C9"; /* ◉ */
-brandBtn.title = "\\uBAA8\\uB4E0 \\uBAA8\\uB4DC \\uD574\\uC81C (ESC)"; /* 모든 모드 해제 */
+brandBtn.title = "Exit all modes (ESC)";
 brandBtn.style.cssText = "width:44px;height:44px;flex:none;border-radius:50%;background:" + C_INK + ";color:#f4f4f0;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 6px 20px rgba(0,0,0,0.35);transition:transform 0.18s ease,color 0.18s ease;";
 brandBtn.onmouseenter = function() { brandBtn.style.transform = "scale(1.07)"; brandBtn.style.color = C_RED; };
 brandBtn.onmouseleave = function() { brandBtn.style.transform = "scale(1)"; brandBtn.style.color = "#f4f4f0"; };
@@ -1685,7 +1685,7 @@ document.addEventListener("mouseup", function(e) {
   try {
     var selected = collectElementsInRect(rect);
     if (selected.length === 0) {
-      showToast("\\uC601\\uC5ED\\uC5D0 \\uC644\\uC804\\uD788 \\uD3EC\\uD568\\uB41C \\uC694\\uC18C\\uAC00 \\uC5C6\\uC2B5\\uB2C8\\uB2E4");
+      showToast("No elements fully inside the area");
     } else {
       openGroupCommentDialog(selected, e.clientX, e.clientY);
     }
@@ -1798,7 +1798,7 @@ document.addEventListener("keydown", function(e) {
     labelEl.style.display = "none";
     closeCommentDialog();
     updateToolbarState();
-    showToast("\\uC778\\uC2A4\\uD399\\uD130 \\uD574\\uC81C (ESC)"); /* 인스펙터 해제 */
+    showToast("Inspector off (ESC)");
     e.preventDefault();
   }
 }, true);
